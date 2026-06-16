@@ -99,6 +99,35 @@ def timecode(frame, fps=FPS):
     return "%02d:%02d:%02d:%02d" % (hh, mm, ss, ff)
 
 
+def extract_exr_timecode(exr_path):
+    """
+    Read the SMPTE timecode embedded in an EXR file's metadata using oiiotool.
+    Unreal's Movie Render Queue writes this as 'smpte:TimeCode' or 'timecode'.
+
+    Returns a timecode string "HH:MM:SS:FF" or None if not found.
+    """
+    try:
+        result = subprocess.run(
+            [OIIOTOOL, "--info", "-v", exr_path],
+            capture_output=True, text=True
+        )
+        for line in result.stdout.splitlines():
+            line_lower = line.lower()
+            if "timecode" in line_lower or "smpte" in line_lower:
+                # Line format: "    smpte:TimeCode: 00:00:00:00"
+                # or           "    timecode: 00:00:00:00"
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    tc = parts[1].strip()
+                    # Validate it looks like HH:MM:SS:FF
+                    tc_parts = tc.replace(";", ":").split(":")
+                    if len(tc_parts) == 4 and all(p.isdigit() for p in tc_parts):
+                        return ":".join(tc_parts)
+    except Exception as e:
+        print("[qt_bake_oiio] WARNING: could not read EXR timecode: %s" % e)
+    return None
+
+
 def is_shot_context(data):
     """Return True if this flag JSON is from a shot render, False for asset."""
     return data.get("type", "shot") != "asset_turntable"
@@ -368,7 +397,19 @@ def bake_sequence(data, output_paths):
         # Frame offset for burn-ins: slate is frame 0, first source frame = 1
         burnin_filters = build_drawtext_filters(data, frame_offset=first - 1)
 
-        # ── 4+5. Encode to ProRes QT with burn-ins ────────────────────────────
+        # ── Extract SMPTE timecode from first EXR frame ───────────────────────
+        first_exr = frame_path(exr_pattern, first)
+        smpte_tc = None
+        if os.path.exists(first_exr):
+            smpte_tc = extract_exr_timecode(first_exr)
+            if smpte_tc:
+                print("[qt_bake_oiio] EXR timecode found: %s" % smpte_tc)
+            else:
+                # Derive from frame number if EXR doesn't carry TC metadata
+                smpte_tc = timecode(first)
+                print("[qt_bake_oiio] No EXR timecode metadata — deriving from frame: %s" % smpte_tc)
+
+        # ── 4+5. Encode to ProRes QT with burn-ins and TC track ───────────────
         for out_path in output_paths:
             out_dir = os.path.dirname(out_path)
             if out_dir and not os.path.exists(out_dir):
@@ -385,8 +426,25 @@ def bake_sequence(data, output_paths):
                 "-vendor", "apl0",
                 "-pix_fmt", "yuv422p10le",
                 "-r", str(FPS),
-                out_path,
             ]
+
+            # Embed SMPTE timecode track — slate occupies frame (first-1),
+            # so offset TC back by one frame so it reads correctly on frame 1
+            if smpte_tc:
+                # Subtract one frame from TC to account for prepended slate
+                tc_parts = smpte_tc.replace(";", ":").split(":")
+                hh, mm, ss, ff = [int(x) for x in tc_parts]
+                total_frames = hh * 3600 * FPS + mm * 60 * FPS + ss * FPS + ff
+                total_frames = max(0, total_frames - 1)
+                ff2  = total_frames % FPS
+                ss2  = (total_frames // FPS) % 60
+                mm2  = (total_frames // FPS // 60) % 60
+                hh2  = total_frames // FPS // 3600
+                slate_tc = "%02d:%02d:%02d:%02d" % (hh2, mm2, ss2, ff2)
+                cmd += ["-timecode", slate_tc]
+
+            cmd.append(out_path)
+
             run(cmd, label="Encode QT: %s" % os.path.basename(out_path))
             print("[qt_bake_oiio] Written: %s" % out_path)
 
@@ -413,3 +471,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

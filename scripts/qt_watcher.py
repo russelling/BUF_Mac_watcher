@@ -120,7 +120,7 @@ def resolve_shot_output_paths(tk, data):
         "Shot":        data["shot_code"],
         "Step":        data["step"],
         "version":     data["version"],
-        "nuke.output": data.get("output", data.get("nuke_output", "main")),
+        "output":      data.get("output", data.get("nuke_output", "main")),
         "YYYY":        now.year,
         "MM":          now.month,
         "DD":          now.day,
@@ -333,3 +333,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

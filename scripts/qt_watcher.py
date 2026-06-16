@@ -282,10 +282,11 @@ def process_flag(tk, sg, flag_path):
     output_paths = [primary_path, editorial_path]
 
     # ── Run bake ─────────────────────────────────────────────────────────────
-    if is_asset:
-        success = run_oiio_bake(flag_path, output_paths)
-    else:
-        success = run_nuke_bake(flag_path, output_paths)
+    # NOTE: both shots and asset turntables route through the license-free
+    # OIIO+FFmpeg bake to avoid requiring an extra Nuke render license on
+    # this headless watcher machine. run_nuke_bake() is kept below but is
+    # currently unused.
+    success = run_oiio_bake(flag_path, output_paths)
 
     if not success:
         log("Bake failed for: %s — flag left in place for retry" % flag_path)
@@ -333,4 +334,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

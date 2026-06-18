@@ -13,3 +13,463 @@
 [2026-06-16 09:03:51] Found 1 flag(s)
 [2026-06-16 09:03:51] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
 [2026-06-16 09:03:51] ERROR resolving output paths: Tried to resolve a path from the template <Sgtk TemplatePath editorial_to_editorial_movie: editorial/to_editorial/{YYYY}_{MM}_{DD}/{Shot}_{Step}_{output}_v{version}.mov> and a set of input fields '{'Episode': '301', 'Scene': '001', 'Shot': '301_001_030', 'Step': 'temp', 'version': 1, 'nuke.output': 'write1', 'YYYY': 2026, 'MM': 6, 'DD': 16}' but the following required fields were missing from the input: ['output']
+[2026-06-16 09:06:50] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-06-16 09:06:51] Found 1 flag(s)
+[2026-06-16 09:06:51] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:06:51] Running Nuke bake: /Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0 -t /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_slate_burnin.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:06:51] ERROR processing /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json: [Errno 2] No such file or directory: '/Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0'
+[2026-06-16 09:07:23] Found 1 flag(s)
+[2026-06-16 09:07:23] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:07:23] Running Nuke bake: /Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0 -t /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_slate_burnin.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:07:23] ERROR processing /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json: [Errno 2] No such file or directory: '/Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0'
+[2026-06-16 09:07:54] Found 1 flag(s)
+[2026-06-16 09:07:54] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:07:54] Running Nuke bake: /Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0 -t /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_slate_burnin.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:07:54] ERROR processing /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json: [Errno 2] No such file or directory: '/Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0'
+[2026-06-16 09:08:26] Found 1 flag(s)
+[2026-06-16 09:08:26] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:08:26] Running Nuke bake: /Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0 -t /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_slate_burnin.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:08:26] ERROR processing /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json: [Errno 2] No such file or directory: '/Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0'
+[2026-06-16 09:08:57] Found 1 flag(s)
+[2026-06-16 09:08:57] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:08:57] Running Nuke bake: /Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0 -t /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_slate_burnin.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:08:57] ERROR processing /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json: [Errno 2] No such file or directory: '/Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0'
+[2026-06-16 09:10:56] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-06-16 09:10:57] Found 1 flag(s)
+[2026-06-16 09:10:57] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:10:57] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:10:58] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_f6rsxeem
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:10:58] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:10:58] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:11:30] Found 1 flag(s)
+[2026-06-16 09:11:30] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:11:30] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:11:30] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_h_nbs5fm
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:11:30] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:11:30] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:12:01] Found 1 flag(s)
+[2026-06-16 09:12:01] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:12:01] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:12:01] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_xxm496cj
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:12:01] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:12:01] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:12:33] Found 1 flag(s)
+[2026-06-16 09:12:33] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:12:33] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:12:33] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_112gc4uw
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:12:33] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:12:33] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:32:13] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-06-16 09:32:15] Found 1 flag(s)
+[2026-06-16 09:32:15] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:32:15] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:32:15] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_mrp5er0e
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:32:15] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:32:15] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:32:46] Found 1 flag(s)
+[2026-06-16 09:32:46] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:32:46] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:32:46] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_9kcsguua
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:32:46] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:32:46] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:33:18] Found 1 flag(s)
+[2026-06-16 09:33:18] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:33:18] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:33:18] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_6yqlvy8r
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:33:18] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:33:18] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:33:50] Found 1 flag(s)
+[2026-06-16 09:33:50] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:33:50] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:33:50] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_3z4ik04h
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:33:50] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:33:50] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:34:21] Found 1 flag(s)
+[2026-06-16 09:34:21] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:34:21] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:34:21] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_ihgn6ee4
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:34:21] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:34:21] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:34:53] Found 1 flag(s)
+[2026-06-16 09:34:53] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:34:53] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:34:53] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_j7qrilff
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:34:53] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:34:53] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:35:24] Found 1 flag(s)
+[2026-06-16 09:35:24] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:35:24] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:35:25] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_vl_59d0t
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:35:25] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:35:25] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:35:56] Found 1 flag(s)
+[2026-06-16 09:35:56] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:35:56] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:35:56] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_t7p54_ln
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:35:56] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:35:56] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:36:28] Found 1 flag(s)
+[2026-06-16 09:36:28] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:36:28] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:36:28] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_32kew5fo
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:36:28] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:36:28] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:36:59] Found 1 flag(s)
+[2026-06-16 09:36:59] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:36:59] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:36:59] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_l1s5u7lb
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:37:00] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:37:00] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:37:31] Found 1 flag(s)
+[2026-06-16 09:37:31] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:37:31] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:37:31] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_ddq_reef
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:37:31] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:37:31] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:38:05] Found 1 flag(s)
+[2026-06-16 09:38:05] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:38:05] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:38:05] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_dv8r06ut
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:38:05] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:38:05] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:38:36] Found 1 flag(s)
+[2026-06-16 09:38:36] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:38:36] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:38:36] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_ysohl_68
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:38:36] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:38:36] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:39:08] Found 1 flag(s)
+[2026-06-16 09:39:08] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:39:08] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:39:08] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_f_l7qv63
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:39:08] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:39:08] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:39:40] Found 1 flag(s)
+[2026-06-16 09:39:40] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:39:40] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:39:40] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_n1q45q_c
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:39:40] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:39:40] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:40:11] Found 1 flag(s)
+[2026-06-16 09:40:11] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:40:11] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:40:11] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_998n5jqp
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:40:11] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:40:11] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:40:43] Found 1 flag(s)
+[2026-06-16 09:40:43] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:40:43] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:40:43] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_s9avq795
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:40:43] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:40:43] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:41:15] Found 1 flag(s)
+[2026-06-16 09:41:15] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:41:15] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:41:15] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_pvn9p1kp
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:41:15] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:41:15] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-16 09:41:46] Found 1 flag(s)
+[2026-06-16 09:41:46] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[2026-06-16 09:41:46] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/review/301_001_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_16/301_001_030_temp_write1_v001.mov
+[2026-06-16 09:41:46] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_x6ugphbl
+[qt_bake_oiio] WARNING: missing frame /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:41:47] ERROR in OIIO bake: Traceback (most recent call last):
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 473, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 468, in main
+    bake_sequence(data, output_paths)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py", line 377, in bake_sequence
+    raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
+RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
+
+[2026-06-16 09:41:47] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry

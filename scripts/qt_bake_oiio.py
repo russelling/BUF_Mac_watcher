@@ -15,7 +15,7 @@ Slate frame:
     - Show logo (top-left)
     - Context-aware text block:
         Shot:  Episode / Scene / Shot / Step / Version / Artist / Date /
-               Frame Range / Submitted For / Description
+               Frame Range / Start TC / Submitted For / Description
         Asset: Asset Type / Asset / Step / Version / Artist / Date /
                Submitted For / Description
 
@@ -24,11 +24,21 @@ Burn-ins on every frame:
                    "{asset_type} - {asset}"  (assets)
     Upper right:   date
     Lower left:    "{shot}_{step}_v{version}"  or  "{asset}_{step}_v{version}"
-    Bottom center: frame number
-    Bottom right:  timecode (HH:MM:SS:FF)
+    Bottom center: source frame number
+    Bottom right:  source timecode (HH:MM:SS:FF), anchored to start_timecode
 
 Requires:
     brew install ffmpeg openimageio
+
+FLAG SCHEMA (2026-06-17): consumes the render-complete flag written by
+render_complete_callback.py. Key fields used here:
+    frame_first, frame_last   - actual rendered frame numbers (ints)
+    start_timecode            - source TC at frame_first, "HH:MM:SS:FF", or
+                                null if the render carried no embedded TC
+    exr_path_pattern          - macOS-resolved EXR pattern (with %04d or ####)
+    cut_in, cut_out           - edit range (currently informational here)
+    shot_code, episode, scene, step, version, artist, date,
+    submitted_for, description
 """
 
 import datetime
@@ -52,15 +62,45 @@ LOGO_PATH = (
 )
 
 OIIOTOOL = "/opt/homebrew/bin/oiiotool"
-FFMPEG = "/opt/homebrew/bin/ffmpeg"
 
-OCIO_CONFIG = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/color/aces_1.2/config.ocio"
-)
+# Point directly at the ffmpeg-full keg, NOT /opt/homebrew/bin/ffmpeg. The
+# regular Homebrew 'ffmpeg' formula is built WITHOUT freetype, so it lacks the
+# 'drawtext' filter the slate and burn-ins require. 'ffmpeg-full' includes it.
+# Using the keg path avoids depending on which ffmpeg the PATH symlink happens
+# to resolve to (a future 'brew' op could flip it and silently break the
+# watcher). If ffmpeg-full is upgraded, update this version-pinned path.
+FFMPEG = "/opt/homebrew/Cellar/ffmpeg-full/8.1.2/bin/ffmpeg"
+
+OCIO_CONFIG = "ocio://studio-config-latest"
+
+# Use the config's SPACE-FREE aliases, not the display names. oiiotool
+# tokenizes positional colorspace arguments on whitespace, so a name like
+# "ARRI LogC4" is misread as two arguments ("ARRI" + "LogC4"). The aliases
+# below (from the config inventory) avoid that entirely.
+#
+# NOTE on the LogC4 step: arri_logc4 is the FULL "ARRI LogC4" colorspace
+# (LogC4 curve + ARRI Wide Gamut 4 primaries), a deliberate choice that
+# differs from the Nuke setup's curve-only "Input - ARRI - Curve - LogC4".
+# If the show .cube LUT expects curve-on-AP1, revisit this.
+OCIO_ACESCG = "ACEScg"        # alias of "ACEScg" (no space anyway)
+OCIO_LOGC4  = "arri_logc4"    # alias of "ARRI LogC4"
+
+# Fallback when SHOW_LUT_PATH is missing: the Studio config expresses Rec.709
+# output as a display + view. These contain spaces and the config provides no
+# space-free aliases for them. They are passed as separate --ociodisplay
+# trailing arguments, which SHOULD be fine - but this path is UNTESTED (it
+# only fires when the show LUT is missing). If it errors on the spaces like
+# --colorconvert did, the alternative is to apply the display via a different
+# mechanism. Test by temporarily renaming the show LUT.
+OCIO_REC709_DISPLAY = "Gamma 2.2 Rec.709 - Display"
+OCIO_REC709_VIEW    = "ACES 2.0 - SDR 100 nits (Rec.709)"
 
 FPS = 24
-FRAME_WIDTH = 1920
-FRAME_HEIGHT = 1080
+
+# Fixed final delivery size for ALL QTs. Every output is letterboxed/
+# pillarboxed to exactly this, regardless of source resolution or squeeze.
+DELIVERY_WIDTH = 1920
+DELIVERY_HEIGHT = 1080
 
 
 # ---------------------------------------------------------------------------
@@ -80,22 +120,61 @@ def run(cmd, label=""):
 
 
 def frame_path(pattern, frame_num):
-    """Expand a #### pattern to an actual frame filename."""
-    return pattern.replace("####", "%04d" % frame_num)
+    """
+    Expand a frame pattern to an actual filename. Supports both #### and
+    %04d style tokens (the flag's exr_path_pattern uses %04d).
+    """
+    if "####" in pattern:
+        return pattern.replace("####", "%04d" % frame_num)
+    if "%04d" in pattern:
+        return pattern % frame_num
+    # No recognised token - return as-is (single file).
+    return pattern
 
 
-def frames_from_pattern(pattern, first, last):
-    """Return list of existing frame paths."""
-    return [frame_path(pattern, f) for f in range(first, last + 1)]
+def get_frame_range(data):
+    """
+    Return (first, last) as ints from the flag.
+
+    Current schema uses scalar frame_first / frame_last (the ACTUAL rendered
+    frame numbers). Older flags used a 'frame_range' [first, last] list -
+    support both so a stale flag doesn't silently bake a 1-frame movie.
+    """
+    if data.get("frame_first") is not None and data.get("frame_last") is not None:
+        return int(data["frame_first"]), int(data["frame_last"])
+    fr = data.get("frame_range")
+    if fr and len(fr) >= 2:
+        return int(fr[0]), int(fr[1])
+    print("[qt_bake_oiio] WARNING: no frame range in flag; defaulting to 1-1")
+    return 1, 1
 
 
-def timecode(frame, fps=FPS):
-    """Convert frame number to HH:MM:SS:FF timecode string."""
+def timecode_from_frame(frame, fps=FPS):
+    """Convert an absolute frame number to HH:MM:SS:FF (last-resort fallback)."""
     total_seconds = frame // fps
     ff = frame % fps
     hh = total_seconds // 3600
     mm = (total_seconds % 3600) // 60
     ss = total_seconds % 60
+    return "%02d:%02d:%02d:%02d" % (hh, mm, ss, ff)
+
+
+def tc_to_frames(tc, fps=FPS):
+    """Parse 'HH:MM:SS:FF' (or ';' drop separator) to a total frame count."""
+    parts = tc.replace(";", ":").split(":")
+    if len(parts) != 4 or not all(p.isdigit() for p in parts):
+        return None
+    hh, mm, ss, ff = (int(x) for x in parts)
+    return hh * 3600 * fps + mm * 60 * fps + ss * fps + ff
+
+
+def frames_to_tc(total_frames, fps=FPS):
+    """Inverse of tc_to_frames: total frame count -> 'HH:MM:SS:FF'."""
+    total_frames = max(0, int(total_frames))
+    ff = total_frames % fps
+    ss = (total_frames // fps) % 60
+    mm = (total_frames // fps // 60) % 60
+    hh = total_frames // fps // 3600
     return "%02d:%02d:%02d:%02d" % (hh, mm, ss, ff)
 
 
@@ -119,13 +198,87 @@ def extract_exr_timecode(exr_path):
                 parts = line.split(":", 1)
                 if len(parts) == 2:
                     tc = parts[1].strip()
-                    # Validate it looks like HH:MM:SS:FF
                     tc_parts = tc.replace(";", ":").split(":")
                     if len(tc_parts) == 4 and all(p.isdigit() for p in tc_parts):
                         return ":".join(tc_parts)
     except Exception as e:
         print("[qt_bake_oiio] WARNING: could not read EXR timecode: %s" % e)
     return None
+
+
+def read_pixel_aspect(exr_path):
+    """
+    Read the PixelAspectRatio from an EXR's metadata via oiiotool --info -v.
+
+    Returns a float (e.g. 2.0 for a 2:1 anamorphic squeeze), or 1.0 if the
+    attribute is absent or unreadable (i.e. treat as non-anamorphic).
+    """
+    try:
+        result = subprocess.run(
+            [OIIOTOOL, "--info", "-v", exr_path],
+            capture_output=True, text=True
+        )
+        for line in result.stdout.splitlines():
+            # Line format: "    PixelAspectRatio: 2" (may be "2", "2.0", etc.)
+            if "pixelaspectratio" in line.lower():
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    try:
+                        par = float(parts[1].strip())
+                        if par > 0:
+                            return par
+                    except ValueError:
+                        pass
+    except Exception as e:
+        print("[qt_bake_oiio] WARNING: could not read PixelAspectRatio: %s" % e)
+    return 1.0
+
+
+def read_resolution(exr_path):
+    """
+    Read the pixel width/height of an EXR via oiiotool --info.
+
+    Returns (width, height) ints, or (None, None) if unreadable.
+    """
+    try:
+        result = subprocess.run(
+            [OIIOTOOL, "--info", exr_path],
+            capture_output=True, text=True
+        )
+        # Typical: "<path> :  1920 x 1080, 4 channel, half openexr"
+        import re
+        m = re.search(r"(\d+)\s*x\s*(\d+)", result.stdout)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    except Exception as e:
+        print("[qt_bake_oiio] WARNING: could not read resolution: %s" % e)
+    return (None, None)
+
+
+def resolve_start_timecode(data, exr_pattern, first):
+    """
+    Determine the source start timecode, in priority order:
+
+      1. start_timecode from the flag (authoritative - captured at submission
+         from the EXR's embedded TC, which is what the artist saw).
+      2. Read it directly from the first EXR's metadata (fallback if the flag
+         didn't carry one).
+      3. Derive from the frame number (last resort - keeps the burn-in
+         populated even when no real TC exists anywhere).
+
+    Returns (tc_string, source_label) for logging/slate clarity.
+    """
+    flag_tc = data.get("start_timecode")
+    if flag_tc:
+        return str(flag_tc), "flag"
+
+    first_exr = frame_path(exr_pattern, first)
+    if os.path.exists(first_exr):
+        exr_tc = extract_exr_timecode(first_exr)
+        if exr_tc:
+            return exr_tc, "exr"
+
+    return timecode_from_frame(first), "frame-derived"
 
 
 def is_shot_context(data):
@@ -137,44 +290,85 @@ def is_shot_context(data):
 # Color bake: single EXR frame -> baked PNG (for slate) or baked EXR (frames)
 # ---------------------------------------------------------------------------
 
-def bake_frame(src_exr, dst_png, cdl_path=None):
+def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
+               desqueeze_to=None, fit_to=None):
     """
     Apply full color pipeline to a single EXR frame using oiiotool:
         ACEScg -> LogC4 -> CDL (optional) -> Show LUT -> Rec.709
 
+    cdl_path     : path to a per-shot .cc to apply, or None to skip.
+    use_show_lut : if True (and the LUT file exists), apply the show LUT for
+                   the final LogC4->Rec.709 step. If False, fall back to a
+                   generic LogC4->Rec.709 colorspace conversion.
+    desqueeze_to : (width, height) to resize the frame to FIRST, for
+                   anamorphic de-squeeze. None means no de-squeeze.
+    fit_to       : (width, height) final delivery size. The (de-squeezed)
+                   image is letterboxed/pillarboxed to fit EXACTLY this box,
+                   preserving aspect with black bars. None means no fit.
+
     Output is an 8-bit PNG suitable for ffmpeg input.
     """
-    cmd = [OIIOTOOL, src_exr]
+    # The OCIO config must be set ONCE, up front, via the top-level
+    # --colorconfig flag. It is NOT a valid modifier on --colorconvert or
+    # --ociofiletransform (those only accept key=/value=/unpremult=/etc).
+    cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
 
     # Step 1: ACEScg -> LogC4 via OCIO
     cmd += [
-        "--colorconvert:config=%s" % OCIO_CONFIG,
-        "ACES - ACEScg",
-        "Input - ARRI - Curve - LogC4 - EI800",
+        "--colorconvert",
+        OCIO_ACESCG,
+        OCIO_LOGC4,
     ]
 
-    # Step 2: CDL if present
+    # Step 2: CDL if present (caller has already decided and logged).
     if cdl_path and os.path.exists(cdl_path):
-        cmd += ["--ociofiletransform:config=%s" % OCIO_CONFIG, cdl_path]
+        cmd += ["--ociofiletransform", cdl_path]
 
-    # Step 3: Show LUT -> Rec.709
-    if os.path.exists(SHOW_LUT_PATH):
-        cmd += ["--ociofiletransform:config=%s" % OCIO_CONFIG, SHOW_LUT_PATH]
+    # Step 3: Show LUT -> Rec.709, or fallback display transform.
+    if use_show_lut and os.path.exists(SHOW_LUT_PATH):
+        cmd += ["--ociofiletransform", SHOW_LUT_PATH]
+    else:
+        cmd += [
+            "--ociodisplay:from=%s" % OCIO_LOGC4,
+            OCIO_REC709_DISPLAY,
+            OCIO_REC709_VIEW,
+        ]
 
-    # Clamp, convert to 8-bit, output PNG
-    cmd += ["--clamp", "0", "1", "--ch", "R,G,B", "-o", dst_png]
+    # Step 4: anamorphic de-squeeze (deliberately change aspect, so resize to
+    # the exact de-squeezed pixel size). Lanczos3 is a sharp resample filter.
+    if desqueeze_to is not None:
+        dw, dh = desqueeze_to
+        cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+
+    # Step 5: fit/letterbox to the fixed delivery size. pad=1 forces the
+    # output to be EXACTLY fit_to with black bars, preserving aspect.
+    if fit_to is not None:
+        fw, fh = fit_to
+        cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+
+    # Clamp, convert to 8-bit, output PNG.
+    # NOTE: --clamp takes min=/max= as colon-appended MODIFIERS, not
+    # positional args. "--clamp 0 1" makes oiiotool treat 0 and 1 as input
+    # filenames (-> "File does not exist: 0").
+    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
 
     run(cmd, label="Color bake: %s" % os.path.basename(src_exr))
 
 
 # ---------------------------------------------------------------------------
-# Burn-ins: overlay text onto a baked PNG using FFmpeg drawtext
+# Burn-ins: overlay text onto frames using FFmpeg drawtext
 # ---------------------------------------------------------------------------
 
-def build_drawtext_filters(data, frame_offset=0):
+def build_drawtext_filters(data, frame_offset, start_tc):
     """
     Build FFmpeg drawtext filter chain for burn-ins.
-    frame_offset accounts for slate prepended at frame 0.
+
+    frame_offset : added to ffmpeg's 0-based output frame index so the
+                   bottom-center counter shows the real source frame number.
+    start_tc     : source start timecode (HH:MM:SS:FF) for the bottom-right
+                   burn-in. Already offset by the caller to account for the
+                   prepended slate, so it reads correctly on the first image
+                   frame.
     """
     is_shot = is_shot_context(data)
 
@@ -196,13 +390,13 @@ def build_drawtext_filters(data, frame_offset=0):
             data.get("version", 1),
         )
 
-    upper_right = data.get("date", "")[:10]  # YYYY-MM-DD only
+    upper_right = str(data.get("date", ""))[:10]  # YYYY-MM-DD only
     font_size = 28
     margin = 40
 
-    # Escape colons for FFmpeg filter syntax
+    # Escape for FFmpeg filter syntax (colons and quotes).
     def esc(s):
-        return str(s).replace(":", r"\:").replace("'", r"\'")
+        return str(s).replace("\\", r"\\").replace(":", r"\:").replace("'", r"\'")
 
     filters = []
 
@@ -224,20 +418,24 @@ def build_drawtext_filters(data, frame_offset=0):
         % (esc(lower_left), margin, margin, font_size)
     )
 
-    # Bottom center: frame number
-    # n = current frame number in ffmpeg (0-based), add frame_offset to get
-    # the actual frame number from the source sequence
+    # Bottom center: source frame number
+    # n = ffmpeg's 0-based output frame index; add frame_offset to recover the
+    # real source frame number (slate is at index 0, first image frame -> first).
     filters.append(
         "drawtext=text='%%{eif\\:n+%d\\:d\\:4}':x=(w-tw)/2:y=h-%d-th:fontsize=%d"
         ":fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
         % (frame_offset, margin, font_size)
     )
 
-    # Bottom right: timecode expressed as frame-derived text
+    # Bottom right: SOURCE timecode, anchored to start_tc and auto-incremented
+    # by drawtext per output frame. This shows editorial-accurate source TC,
+    # NOT elapsed playback time. A space 'text' is required alongside the
+    # timecode option on many ffmpeg builds.
+    tc_esc = start_tc.replace(":", r"\:")
     filters.append(
-        "drawtext=text='%%{pts\\:hms}':x=w-%d-tw:y=h-%d-th:fontsize=%d"
-        ":fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (margin, margin, font_size)
+        "drawtext=timecode='%s':timecode_rate=%d:text=' ':x=w-%d-tw:y=h-%d-th"
+        ":fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (tc_esc, FPS, margin, margin, font_size)
     )
 
     return ",".join(filters)
@@ -247,9 +445,12 @@ def build_drawtext_filters(data, frame_offset=0):
 # Slate frame builder
 # ---------------------------------------------------------------------------
 
-def build_slate_png(data, dst_path):
+def build_slate_png(data, dst_path, first, last, start_tc, width, height):
     """
     Render a slate frame as a PNG using FFmpeg's lavfi source + drawtext.
+
+    width/height are the OUTPUT dimensions - must match the (possibly
+    de-squeezed) image frames so concat/append doesn't mismatch.
     """
     is_shot = is_shot_context(data)
 
@@ -269,11 +470,9 @@ def build_slate_png(data, dst_path):
         context_line,
         "Step: %s   Version: v%03d" % (data.get("step", ""), data.get("version", 1)),
         "Artist: %s" % data.get("artist", ""),
-        "Date: %s" % data.get("date", "")[:10],
-        "Frame Range: %s - %s" % (
-            data.get("frame_range", [1, 1])[0],
-            data.get("frame_range", [1, 1])[1],
-        ),
+        "Date: %s" % str(data.get("date", ""))[:10],
+        "Frame Range: %s - %s" % (first, last),
+        "Start TC: %s" % (start_tc if start_tc else "n/a"),
         "Submitted For: %s" % data.get("submitted_for", ""),
         "Description: %s" % data.get("description", ""),
     ]
@@ -283,35 +482,39 @@ def build_slate_png(data, dst_path):
     margin_x = 80
     start_y = 280  # below logo area
 
-    # Build drawtext filter chain for slate lines
     text_filters = []
     for i, line in enumerate(lines):
         y = start_y + i * line_height
-        escaped = line.replace(":", r"\:").replace("'", r"\'")
+        escaped = str(line).replace("\\", r"\\").replace(":", r"\:").replace("'", r"\'")
         text_filters.append(
             "drawtext=text='%s':x=%d:y=%d:fontsize=%d:fontcolor=white"
             % (escaped, margin_x, y, font_size)
         )
 
-    # If logo exists, overlay it
     if os.path.exists(LOGO_PATH):
         # First generate black bg + text, then overlay logo
         black_with_text = dst_path + ".notlogo.png"
         cmd = [
             FFMPEG, "-y",
             "-f", "lavfi",
-            "-i", "color=black:size=%dx%d:rate=1" % (FRAME_WIDTH, FRAME_HEIGHT),
+            "-i", "color=black:size=%dx%d:rate=1" % (width, height),
             "-vframes", "1",
             "-vf", ",".join(text_filters),
             black_with_text,
         ]
         run(cmd, label="Slate text layer")
 
-        # Overlay logo top-left with oiiotool
+        # oiiotool --over requires BOTH images to have an alpha channel. The
+        # ffmpeg-generated background is RGB only, so add an opaque alpha to
+        # it first (--ch R,G,B,A=1.0). The logo PNG carries its own alpha.
+        # --invert flips the logo's RGB (chbegin=0,chend=3 by default leaves
+        # alpha intact), so a light teardrop becomes dark and vice versa.
         cmd = [
             OIIOTOOL,
             black_with_text,
+            "--ch", "R,G,B,A=1.0",
             LOGO_PATH,
+            "--invert",
             "--over",
             "-o", dst_path,
         ]
@@ -321,7 +524,7 @@ def build_slate_png(data, dst_path):
         cmd = [
             FFMPEG, "-y",
             "-f", "lavfi",
-            "-i", "color=black:size=%dx%d:rate=1" % (FRAME_WIDTH, FRAME_HEIGHT),
+            "-i", "color=black:size=%dx%d:rate=1" % (width, height),
             "-vframes", "1",
             "-vf", ",".join(text_filters),
             dst_path,
@@ -343,10 +546,15 @@ def bake_sequence(data, output_paths):
       5. Encode to ProRes QT for each output path
     """
     exr_pattern = data.get("exr_path") or data.get("exr_path_pattern", "")
-    frame_range = data.get("frame_range", [1, 1])
-    first, last = int(frame_range[0]), int(frame_range[1])
+    first, last = get_frame_range(data)
 
-    # CDL path (shots only — assets skip CDL)
+    # Resolve the source start timecode (flag -> EXR -> frame-derived).
+    start_tc, tc_source = resolve_start_timecode(data, exr_pattern, first)
+    print("[qt_bake_oiio] Start TC: %s (source: %s)" % (start_tc, tc_source))
+
+    # CDL path (shots only — assets skip CDL). CDL is an optional creative
+    # grade: if absent, skip it but log so it's visible that the QT is
+    # ungraded.
     cdl_path = None
     if is_shot_context(data):
         shot = data.get("shot_code", "")
@@ -358,6 +566,51 @@ def bake_sequence(data, output_paths):
         )
         if os.path.exists(cdl_guess):
             cdl_path = cdl_guess
+            print("[qt_bake_oiio] CDL: applying %s" % cdl_guess)
+        else:
+            print("[qt_bake_oiio] CDL: none found at %s — baking UNGRADED" % cdl_guess)
+    else:
+        print("[qt_bake_oiio] CDL: skipped (asset turntable)")
+
+    # Show LUT presence: decided once. If missing, fall back to a generic
+    # LogC4->Rec.709 conversion (viewable, roughly correct) rather than
+    # shipping flat log. Log it loudly since the look will differ from final.
+    use_show_lut = os.path.exists(SHOW_LUT_PATH)
+    if use_show_lut:
+        print("[qt_bake_oiio] Show LUT: applying %s" % SHOW_LUT_PATH)
+    else:
+        print(
+            "[qt_bake_oiio] Show LUT: NOT FOUND at %s — falling back to display "
+            "transform '%s' / '%s'. Look will differ from final show look."
+            % (SHOW_LUT_PATH, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
+        )
+
+    # Anamorphic de-squeeze + fixed delivery size. Read the pixel aspect
+    # ratio and resolution ONCE from the first frame (a sequence shares one
+    # PAR). If PAR != 1.0, de-squeeze by reducing height (new_height =
+    # height / PAR), keeping width. Then EVERY frame is letterboxed to the
+    # fixed DELIVERY_WIDTH x DELIVERY_HEIGHT, so all QTs are 1920x1080
+    # regardless of source resolution. The slate is always delivery size too.
+    first_exr = frame_path(exr_pattern, first)
+    src_w, src_h = read_resolution(first_exr)
+    par = read_pixel_aspect(first_exr)
+    desqueeze_to = None
+    if src_w is None or src_h is None:
+        print("[qt_bake_oiio] Resolution: could not read; no de-squeeze applied")
+    elif par and abs(par - 1.0) > 1e-3:
+        new_h = int(round(src_h / par))
+        print(
+            "[qt_bake_oiio] Anamorphic: PAR=%.4f, de-squeezing %dx%d -> %dx%d "
+            "(height/PAR, Lanczos3)" % (par, src_w, src_h, src_w, new_h)
+        )
+        desqueeze_to = (src_w, new_h)
+    else:
+        print("[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze")
+
+    # All QTs deliver at this fixed size, letterboxed.
+    fit_to = (DELIVERY_WIDTH, DELIVERY_HEIGHT)
+    out_w, out_h = DELIVERY_WIDTH, DELIVERY_HEIGHT
+    print("[qt_bake_oiio] Delivery: letterboxing to %dx%d" % (out_w, out_h))
 
     with tempfile.TemporaryDirectory(prefix="qt_bake_") as tmpdir:
         print("[qt_bake_oiio] Working in temp dir: %s" % tmpdir)
@@ -370,7 +623,10 @@ def bake_sequence(data, output_paths):
                 print("[qt_bake_oiio] WARNING: missing frame %s" % src)
                 continue
             dst = os.path.join(tmpdir, "frame_%04d.png" % frame_num)
-            bake_frame(src, dst, cdl_path=cdl_path)
+            bake_frame(
+                src, dst, cdl_path=cdl_path, use_show_lut=use_show_lut,
+                desqueeze_to=desqueeze_to, fit_to=fit_to,
+            )
             baked_frames.append(dst)
 
         if not baked_frames:
@@ -378,13 +634,12 @@ def bake_sequence(data, output_paths):
 
         # ── 2. Build slate ────────────────────────────────────────────────────
         slate_path = os.path.join(tmpdir, "slate.png")
-        build_slate_png(data, slate_path)
+        build_slate_png(data, slate_path, first, last, start_tc, out_w, out_h)
 
         # ── 3. Build frame list for FFmpeg concat ─────────────────────────────
-        # Slate = 1 frame (frame 0), then baked frames start at 1
+        # Slate = 1 frame (output index 0), then baked frames follow.
         concat_list = os.path.join(tmpdir, "frames.txt")
         with open(concat_list, "w") as f:
-            # Slate held for 1 frame
             f.write("file '%s'\n" % slate_path)
             f.write("duration %f\n" % (1.0 / FPS))
             for baked in baked_frames:
@@ -394,20 +649,28 @@ def bake_sequence(data, output_paths):
             if baked_frames:
                 f.write("file '%s'\n" % baked_frames[-1])
 
-        # Frame offset for burn-ins: slate is frame 0, first source frame = 1
-        burnin_filters = build_drawtext_filters(data, frame_offset=first - 1)
+        # Burn-in frame offset: output index 0 is the slate, so the first
+        # image frame (output index 1) must read the real source 'first'.
+        # eif uses n (0-based). At n=1 we want 'first', so offset = first - 1.
+        burnin_offset = first - 1
 
-        # ── Extract SMPTE timecode from first EXR frame ───────────────────────
-        first_exr = frame_path(exr_pattern, first)
-        smpte_tc = None
-        if os.path.exists(first_exr):
-            smpte_tc = extract_exr_timecode(first_exr)
-            if smpte_tc:
-                print("[qt_bake_oiio] EXR timecode found: %s" % smpte_tc)
-            else:
-                # Derive from frame number if EXR doesn't carry TC metadata
-                smpte_tc = timecode(first)
-                print("[qt_bake_oiio] No EXR timecode metadata — deriving from frame: %s" % smpte_tc)
+        # Burn-in timecode start: the slate occupies output frame 0, and
+        # drawtext starts counting timecode from output frame 0. So set the
+        # burn-in start TC one frame BEFORE the source start, so that the
+        # first image frame (output index 1) reads exactly start_tc.
+        start_tc_frames = tc_to_frames(start_tc)
+        if start_tc_frames is not None:
+            burnin_start_tc = frames_to_tc(start_tc_frames - 1)
+        else:
+            # Unparseable TC - fall back to the raw value (burn-in still shows
+            # something rather than crashing).
+            burnin_start_tc = start_tc
+
+        burnin_filters = build_drawtext_filters(data, burnin_offset, burnin_start_tc)
+
+        # Embedded SMPTE timecode track: same one-frame-back offset so the
+        # QT's TC track aligns with the first image frame, not the slate.
+        embed_tc = burnin_start_tc
 
         # ── 4+5. Encode to ProRes QT with burn-ins and TC track ───────────────
         for out_path in output_paths:
@@ -428,20 +691,8 @@ def bake_sequence(data, output_paths):
                 "-r", str(FPS),
             ]
 
-            # Embed SMPTE timecode track — slate occupies frame (first-1),
-            # so offset TC back by one frame so it reads correctly on frame 1
-            if smpte_tc:
-                # Subtract one frame from TC to account for prepended slate
-                tc_parts = smpte_tc.replace(";", ":").split(":")
-                hh, mm, ss, ff = [int(x) for x in tc_parts]
-                total_frames = hh * 3600 * FPS + mm * 60 * FPS + ss * FPS + ff
-                total_frames = max(0, total_frames - 1)
-                ff2  = total_frames % FPS
-                ss2  = (total_frames // FPS) % 60
-                mm2  = (total_frames // FPS // 60) % 60
-                hh2  = total_frames // FPS // 3600
-                slate_tc = "%02d:%02d:%02d:%02d" % (hh2, mm2, ss2, ff2)
-                cmd += ["-timecode", slate_tc]
+            if embed_tc:
+                cmd += ["-timecode", embed_tc]
 
             cmd.append(out_path)
 
@@ -471,4 +722,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

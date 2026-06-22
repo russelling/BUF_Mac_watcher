@@ -473,3 +473,63 @@ RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/
 RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_v002.%04d.exr
 
 [2026-06-16 09:41:47] Bake failed for: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/001/301_001_030/render/work/301_001_030_temp_write1_v001/.render_complete_301_001_030_temp_write1_v001.json — flag left in place for retry
+[2026-06-18 20:37:51] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-06-18 20:37:53] Found 2 flag(s)
+[2026-06-18 20:37:53] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v002/.render_complete_301_999_030_temp_v002.json
+[2026-06-18 20:37:53] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v002/.render_complete_301_999_030_temp_v002.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/review/301_999_030_temp_v002.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_18/301_999_030_temp_v002.mov
+[2026-06-18 20:38:03] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v002/.render_complete_301_999_030_temp_v002.json
+[qt_bake_oiio] Start TC: 00:00:41:17 (source: frame-derived)
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/plates/301_999_030.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/color/luts/ARRILogC4_SEV_S3_V3_digital_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_4crdoh3n
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1001.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1002.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1003.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1004.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1005.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1006.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1007.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1008.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1009.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v002.1010.exr
+[qt_bake_oiio] Slate text layer
+[qt_bake_oiio] Slate logo overlay
+[qt_bake_oiio] Encode QT: 301_999_030_temp_v002.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/review/301_999_030_temp_v002.mov
+[qt_bake_oiio] Encode QT: 301_999_030_temp_v002.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_18/301_999_030_temp_v002.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-06-18 20:38:09] Uploaded Version 76586 (301_999_030_temp_v002)
+[2026-06-18 20:38:09] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v002/.render_complete_301_999_030_temp_v002.json
+[2026-06-18 20:38:09] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v001/.render_complete_301_999_030_temp_v001.json
+[2026-06-18 20:38:09] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v001/.render_complete_301_999_030_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/review/301_999_030_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_18/301_999_030_temp_v001.mov
+[2026-06-18 20:38:21] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v001/.render_complete_301_999_030_temp_v001.json
+[qt_bake_oiio] Start TC: 02:42:12:06 (source: flag)
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/plates/301_999_030.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/color/luts/ARRILogC4_SEV_S3_V3_digital_R709.cube
+[qt_bake_oiio] Anamorphic: PAR=2.0000, de-squeezing 4608x3164 -> 4608x1582 (height/PAR, Lanczos3)
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/5n/2r17y5z54y573yk91gggt_kw0000gr/T/qt_bake_e7yi4z4b
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1001.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1002.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1003.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1004.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1005.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1006.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1007.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1008.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1009.exr
+[qt_bake_oiio] Color bake: 301_999_030_temp_v001.1010.exr
+[qt_bake_oiio] Slate text layer
+[qt_bake_oiio] Slate logo overlay
+[qt_bake_oiio] Encode QT: 301_999_030_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/review/301_999_030_temp_v001.mov
+[qt_bake_oiio] Encode QT: 301_999_030_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial/to_editorial/2026_06_18/301_999_030_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-06-18 20:38:24] Uploaded Version 76587 (301_999_030_temp_v001)
+[2026-06-18 20:38:24] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/999/301_999_030/render/work/301_999_030_temp_v001/.render_complete_301_999_030_temp_v001.json

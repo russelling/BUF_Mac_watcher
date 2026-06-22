@@ -112,7 +112,14 @@ def find_flags():
 # ---------------------------------------------------------------------------
 
 def resolve_shot_output_paths(tk, data):
-    """Resolve output paths for a shot render flag."""
+    """Resolve output paths for a shot render flag.
+
+    The 'output' token is intentionally omitted: the EXR renders use the
+    clean {Shot}_{Step}_v{version} convention (output resolves to null), and
+    the movie templates either have no output key (ep_nuke_shot_render_movie)
+    or an optional [_{nuke.output}] segment (editorial) that should drop when
+    output is absent. So we do NOT inject an output/nuke.output field here.
+    """
     now = datetime.datetime.now()
     fields = {
         "Episode":     data["episode"],
@@ -120,11 +127,16 @@ def resolve_shot_output_paths(tk, data):
         "Shot":        data["shot_code"],
         "Step":        data["step"],
         "version":     data["version"],
-        "output":      data.get("output", data.get("nuke_output", "main")),
         "YYYY":        now.year,
         "MM":          now.month,
         "DD":          now.day,
     }
+    # Only carry an output token through if the flag actually has a non-null
+    # one (it normally does not). The editorial template's key is the dotted
+    # "nuke.output"; ep_nuke_shot_render_movie has no output key at all.
+    if data.get("output"):
+        fields["nuke.output"] = data["output"]
+
     shot_movie_path      = tk.templates["ep_nuke_shot_render_movie"].apply_fields(fields)
     editorial_movie_path = tk.templates["editorial_to_editorial_movie"].apply_fields(fields)
     return shot_movie_path, editorial_movie_path
@@ -197,6 +209,24 @@ def run_oiio_bake(flag_path, output_paths):
 # ShotGrid upload
 # ---------------------------------------------------------------------------
 
+def _valid_list_values(sg, entity_type, field_name):
+    """
+    Return the set of valid values for a ShotGrid list field, or None if it
+    can't be determined. Used to avoid setting a list field to a value that
+    isn't a configured option (which errors or is silently dropped).
+    """
+    try:
+        schema = sg.schema_field_read(entity_type, field_name)
+        props = schema.get(field_name, {}).get("properties", {})
+        valid = props.get("valid_values", {}).get("value")
+        if valid:
+            return set(valid)
+    except Exception as exc:
+        log("WARNING: could not read schema for %s.%s: %s"
+            % (entity_type, field_name, exc))
+    return None
+
+
 def upload_version(sg, data, movie_path):
     """Create a Version in ShotGrid and upload the QT."""
     is_asset = data.get("type") == "asset_turntable"
@@ -219,9 +249,20 @@ def upload_version(sg, data, movie_path):
         "entity":            {"type": data.get("entity_type", "Shot"),
                               "id":   data["entity_id"]},
         "description":       data.get("description", ""),
-        "sg_submitted_for":  data.get("submitted_for", ""),
         "sg_path_to_movie":  movie_path,
     }
+
+    # sg_submitted_for is a LIST field: only set it if the flag's value is one
+    # of the field's configured options. Setting an unconfigured value errors
+    # or is silently dropped, so validate first and warn rather than fail.
+    submitted_for = data.get("submitted_for")
+    if submitted_for:
+        valid = _valid_list_values(sg, "Version", "sg_submitted_for")
+        if valid is None or submitted_for in valid:
+            version_data["sg_submitted_for"] = submitted_for
+        else:
+            log("WARNING: submitted_for '%s' is not a valid sg_submitted_for "
+                "option %s — leaving field unset" % (submitted_for, sorted(valid)))
 
     if data.get("task_id"):
         version_data["sg_task"] = {"type": "Task", "id": data["task_id"]}
@@ -252,8 +293,12 @@ def mark_processed(flag_path):
     if PROCESSED_ACTION == "delete":
         os.remove(flag_path)
     else:
-        new_path = flag_path.replace(".render_complete_", ".processed_")
-        os.rename(flag_path, new_path)
+        # Rename only the basename so a directory that happens to contain
+        # ".render_complete_" can't be corrupted by a path-wide replace.
+        d = os.path.dirname(flag_path)
+        base = os.path.basename(flag_path)
+        new_base = base.replace(".render_complete_", ".processed_", 1)
+        os.rename(flag_path, os.path.join(d, new_base))
 
 
 # ---------------------------------------------------------------------------

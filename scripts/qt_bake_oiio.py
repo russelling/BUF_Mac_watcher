@@ -58,7 +58,7 @@ SHOW_LUT_PATH = (
     "ARRILogC4_SEV_S3_V3_digital_R709.cube"
 )
 LOGO_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/GLOBALS/logo/teardrop.png"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/GLOBALS/logo/teardrop_blk1.png"
 )
 
 OIIOTOOL = "/opt/homebrew/bin/oiiotool"
@@ -101,6 +101,51 @@ FPS = 24
 # pillarboxed to exactly this, regardless of source resolution or squeeze.
 DELIVERY_WIDTH = 1920
 DELIVERY_HEIGHT = 1080
+
+# ---------------------------------------------------------------------------
+# Slate title + thumbnails + bottom strip
+# ---------------------------------------------------------------------------
+
+SLATE_TITLE = "BUFFALO S3"
+
+# drawtext needs an actual font FILE, not a family name. This points at the
+# stock macOS Arial Bold (present by default in Fonts/Supplemental on every
+# Mac, no extra license needed) for a bold geometric-grotesk look in the
+# same spirit as modern minimal show titles. VERIFY this path exists on the
+# Mac Studio (`ls "/System/Library/Fonts/Supplemental/Arial Bold.ttf"`); if
+# missing, point this at any bold sans .ttf/.otf already licensed for the
+# show instead.
+TITLE_FONT_PATH = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+TITLE_FONT_SIZE = 110
+TITLE_X = 80
+TITLE_Y = 50
+
+# Logo: top right, with a fixed margin from both edges. Uses ffmpeg overlay's
+# main_w/overlay_w expressions so it's correctly right-aligned regardless of
+# the logo PNG's actual pixel dimensions - no need to hardcode its size here.
+LOGO_MARGIN = 60
+
+# Three thumbnails (first / mid / last rendered frame), full color baked
+# through the same ACEScg->LogC4->CDL->Show LUT->Rec.709 chain as the main
+# QT, laid out as one even row beneath the title/metadata text block and
+# above the bottom gradient strip. Equal size, no rotation, no overlap.
+SBS_MARGIN_X = 80
+SBS_GAP = 40
+SBS_Y = 700
+SBS_HEIGHT = 250
+SBS_WIDTH = (DELIVERY_WIDTH - 2 * SBS_MARGIN_X - 2 * SBS_GAP) // 3
+SBS_SIZE = (SBS_WIDTH, SBS_HEIGHT)
+
+# Bottom strip: a row of grayscale steps (black -> white) over a row of
+# saturated color bars (white, yellow, cyan, green, magenta, red, blue) -
+# standard technical reference bars, full delivery width, sitting at the
+# very bottom edge of the slate.
+STRIP_HEIGHT = 120                 # total height, split evenly between rows
+STRIP_ROW_HEIGHT = STRIP_HEIGHT // 2
+GRAYSCALE_STEPS = 12
+COLOR_BARS = [
+    "white", "yellow", "cyan", "green", "magenta", "red", "blue",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +400,48 @@ def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
     run(cmd, label="Color bake: %s" % os.path.basename(src_exr))
 
 
+def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size):
+    """
+    Same color pipeline as bake_frame (ACEScg -> LogC4 -> CDL -> Show LUT ->
+    Rec.709), but for a small slate collage print rather than a delivery
+    frame: resizes directly to the exact (w, h) box with NO letterbox
+    padding, since the collage prints sit on the slate's own black/white
+    border treatment rather than needing to preserve source aspect exactly.
+    A small amount of aspect distortion at thumbnail size is an acceptable
+    tradeoff for filling the print cleanly.
+
+    Deliberately a standalone function (not sharing code with bake_frame)
+    per the existing convention in this file - keeps each bake path self
+    contained and easy to reason about independently.
+    """
+    cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
+
+    cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
+
+    if cdl_path and os.path.exists(cdl_path):
+        cmd += ["--ociofiletransform", cdl_path]
+
+    if use_show_lut and os.path.exists(SHOW_LUT_PATH):
+        cmd += ["--ociofiletransform", SHOW_LUT_PATH]
+    else:
+        cmd += [
+            "--ociodisplay:from=%s" % OCIO_LOGC4,
+            OCIO_REC709_DISPLAY,
+            OCIO_REC709_VIEW,
+        ]
+
+    if desqueeze_to is not None:
+        dw, dh = desqueeze_to
+        cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+
+    w, h = size
+    cmd += ["--resize:filter=lanczos3", "%dx%d" % (w, h)]
+
+    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
+
+    run(cmd, label="Thumbnail bake: %s" % os.path.basename(src_exr))
+
+
 # ---------------------------------------------------------------------------
 # Burn-ins: overlay text onto frames using FFmpeg drawtext
 # ---------------------------------------------------------------------------
@@ -445,12 +532,29 @@ def build_drawtext_filters(data, frame_offset, start_tc):
 # Slate frame builder
 # ---------------------------------------------------------------------------
 
-def build_slate_png(data, dst_path, first, last, start_tc, width, height):
+def _esc_drawtext(s):
+    """Escape a string for safe use inside an FFmpeg drawtext text= value."""
+    return str(s).replace("\\", r"\\").replace(":", r"\:").replace("'", r"\'")
+
+
+def build_slate_png(data, dst_path, first, last, start_tc, width, height,
+                     tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to):
     """
-    Render a slate frame as a PNG using FFmpeg's lavfi source + drawtext.
+    Render a slate frame as a PNG: title + metadata text block over a black
+    background, a row of three equal-size frame thumbnails (first/mid/last)
+    below it, the show logo top right, and a grayscale + color bar reference
+    strip along the bottom. The three thumbnails are run through the same
+    full color pipeline as the deliverable frames (ACEScg -> LogC4 -> CDL ->
+    Show LUT -> Rec.709), so they match the graded look of the shot rather
+    than showing raw/log plates.
 
     width/height are the OUTPUT dimensions - must match the (possibly
     de-squeezed) image frames so concat/append doesn't mismatch.
+
+    tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to are passed
+    through from bake_sequence() so the thumbnails can be baked with the
+    exact same color decisions (CDL presence, show LUT presence, de-squeeze)
+    already resolved for the main bake - no re-deriving them here.
     """
     is_shot = is_shot_context(data)
 
@@ -480,56 +584,147 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height):
     font_size = 36
     line_height = 52
     margin_x = 80
-    start_y = 280  # below logo area
+    # Pushed down from the old start_y=280 to clear the new title block
+    # (TITLE_Y + TITLE_FONT_SIZE + breathing room).
+    start_y = TITLE_Y + TITLE_FONT_SIZE + 60
 
     text_filters = []
     for i, line in enumerate(lines):
         y = start_y + i * line_height
-        escaped = str(line).replace("\\", r"\\").replace(":", r"\:").replace("'", r"\'")
         text_filters.append(
             "drawtext=text='%s':x=%d:y=%d:fontsize=%d:fontcolor=white"
-            % (escaped, margin_x, y, font_size)
+            % (_esc_drawtext(line), margin_x, y, font_size)
         )
 
-    if os.path.exists(LOGO_PATH):
-        # First generate black bg + text, then overlay logo
-        black_with_text = dst_path + ".notlogo.png"
-        cmd = [
-            FFMPEG, "-y",
-            "-f", "lavfi",
-            "-i", "color=black:size=%dx%d:rate=1" % (width, height),
-            "-vframes", "1",
-            "-vf", ",".join(text_filters),
-            black_with_text,
-        ]
-        run(cmd, label="Slate text layer")
+    # Title, using the explicit font file so it reads as a bold geometric
+    # sans regardless of which default font fontconfig would otherwise pick.
+    title_filter = (
+        "drawtext=text='%s':fontfile='%s':x=%d:y=%d:fontsize=%d:fontcolor=white"
+        % (_esc_drawtext(SLATE_TITLE), TITLE_FONT_PATH, TITLE_X, TITLE_Y, TITLE_FONT_SIZE)
+    )
 
-        # oiiotool --over requires BOTH images to have an alpha channel. The
-        # ffmpeg-generated background is RGB only, so add an opaque alpha to
-        # it first (--ch R,G,B,A=1.0). The logo PNG carries its own alpha.
-        # --invert flips the logo's RGB (chbegin=0,chend=3 by default leaves
-        # alpha intact), so a light teardrop becomes dark and vice versa.
-        cmd = [
-            OIIOTOOL,
-            black_with_text,
-            "--ch", "R,G,B,A=1.0",
-            LOGO_PATH,
-            "--invert",
-            "--over",
-            "-o", dst_path,
-        ]
-        run(cmd, label="Slate logo overlay")
-        os.remove(black_with_text)
+    # ── Bake the three thumbnails (first / mid / last), full color ─────────
+    mid = (first + last) // 2
+
+    def _nearest_existing(frame_num):
+        """If the exact frame is missing on disk, nudge inward until one
+        exists, so a single dropped frame doesn't take out the whole slate."""
+        if os.path.exists(frame_path(exr_pattern, frame_num)):
+            return frame_num
+        for delta in range(1, (last - first) + 1):
+            for candidate in (frame_num - delta, frame_num + delta):
+                if first <= candidate <= last and os.path.exists(frame_path(exr_pattern, candidate)):
+                    return candidate
+        return None
+
+    frame_first_actual = _nearest_existing(first)
+    frame_mid_actual = _nearest_existing(mid)
+    frame_last_actual = _nearest_existing(last)
+
+    thumb1_png = os.path.join(tmpdir, "slate_thumb_1.png")
+    thumb2_png = os.path.join(tmpdir, "slate_thumb_2.png")
+    thumb3_png = os.path.join(tmpdir, "slate_thumb_3.png")
+
+    have_thumbs = all(
+        f is not None for f in (frame_first_actual, frame_mid_actual, frame_last_actual)
+    )
+
+    if have_thumbs:
+        bake_thumbnail(
+            frame_path(exr_pattern, frame_first_actual), thumb1_png,
+            cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+        )
+        bake_thumbnail(
+            frame_path(exr_pattern, frame_mid_actual), thumb2_png,
+            cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+        )
+        bake_thumbnail(
+            frame_path(exr_pattern, frame_last_actual), thumb3_png,
+            cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+        )
     else:
-        cmd = [
-            FFMPEG, "-y",
-            "-f", "lavfi",
-            "-i", "color=black:size=%dx%d:rate=1" % (width, height),
-            "-vframes", "1",
-            "-vf", ",".join(text_filters),
-            dst_path,
-        ]
-        run(cmd, label="Slate frame")
+        print(
+            "[qt_bake_oiio] WARNING: could not find all of first/mid/last "
+            "frames on disk for the slate thumbnail row - skipping "
+            "thumbnails, slate will show title/text/strip only."
+        )
+
+    # ── Composite: bg -> [3 side-by-side thumbnails] -> logo -> strip -> text ──
+    inputs = [
+        "-f", "lavfi", "-i", "color=black:size=%dx%d:rate=1" % (width, height),
+    ]
+    next_input_idx = 1  # input 0 is the lavfi black background
+    filter_parts = []
+    cur_label = "0:v"
+
+    if have_thumbs:
+        thumb_idx_1, thumb_idx_2, thumb_idx_3 = next_input_idx, next_input_idx + 1, next_input_idx + 2
+        inputs += ["-i", thumb1_png, "-i", thumb2_png, "-i", thumb3_png]
+        next_input_idx += 3
+
+        x1 = SBS_MARGIN_X
+        x2 = SBS_MARGIN_X + SBS_WIDTH + SBS_GAP
+        x3 = SBS_MARGIN_X + 2 * (SBS_WIDTH + SBS_GAP)
+
+        filter_parts.append("[0:v][%d:v]overlay=%d:%d[bg1]" % (thumb_idx_1, x1, SBS_Y))
+        filter_parts.append("[bg1][%d:v]overlay=%d:%d[bg2]" % (thumb_idx_2, x2, SBS_Y))
+        filter_parts.append("[bg2][%d:v]overlay=%d:%d[bg3]" % (thumb_idx_3, x3, SBS_Y))
+        cur_label = "bg3"
+
+    have_logo = os.path.exists(LOGO_PATH)
+    if have_logo:
+        logo_idx = next_input_idx
+        inputs += ["-i", LOGO_PATH]
+        next_input_idx += 1
+        # Top right: ffmpeg's main_w/overlay_w expressions right-align the
+        # logo regardless of its native pixel size, so LOGO_MARGIN alone
+        # controls the gap from both edges.
+        filter_parts.append(
+            "[%s][%d:v]overlay=main_w-overlay_w-%d:%d[bg4]"
+            % (cur_label, logo_idx, LOGO_MARGIN, LOGO_MARGIN)
+        )
+        cur_label = "bg4"
+
+    # ── Bottom reference strip: grayscale row over a saturated color-bar row ──
+    strip_filters = []
+    strip_y_top = height - STRIP_HEIGHT
+    strip_y_bottom = height - STRIP_ROW_HEIGHT
+    gray_step_w = width / float(GRAYSCALE_STEPS)
+    for i in range(GRAYSCALE_STEPS):
+        # Evenly spaced black -> white steps, last step forced to pure white
+        # so the ramp actually reaches 0xFFFFFF rather than stopping short.
+        level = int(round(255 * i / (GRAYSCALE_STEPS - 1)))
+        hexcol = "%02x%02x%02x" % (level, level, level)
+        seg_x = int(round(i * gray_step_w))
+        seg_w = int(round((i + 1) * gray_step_w)) - seg_x
+        strip_filters.append(
+            "drawbox=x=%d:y=%d:w=%d:h=%d:color=0x%s:t=fill"
+            % (seg_x, strip_y_top, seg_w, STRIP_ROW_HEIGHT, hexcol)
+        )
+    bar_step_w = width / float(len(COLOR_BARS))
+    for i, color in enumerate(COLOR_BARS):
+        seg_x = int(round(i * bar_step_w))
+        seg_w = int(round((i + 1) * bar_step_w)) - seg_x
+        strip_filters.append(
+            "drawbox=x=%d:y=%d:w=%d:h=%d:color=%s:t=fill"
+            % (seg_x, strip_y_bottom, seg_w, STRIP_ROW_HEIGHT, color)
+        )
+
+    all_overlay_filters = strip_filters + [title_filter] + text_filters
+    if filter_parts:
+        # Chain the strip + drawtext onto the last labeled node, output [out].
+        filter_parts[-1] += ";[%s]%s[out]" % (cur_label, ",".join(all_overlay_filters))
+        filter_complex = ";".join(filter_parts)
+    else:
+        # No thumbnails, no logo: strip + drawtext chain straight on the bg.
+        filter_complex = "[0:v]%s[out]" % ",".join(all_overlay_filters)
+
+    cmd = [FFMPEG, "-y"] + inputs + [
+        "-filter_complex", filter_complex,
+        "-map", "[out]",
+        "-vframes", "1", dst_path,
+    ]
+    run(cmd, label="Slate frame (title + thumbnails + strip + text)")
 
 
 # ---------------------------------------------------------------------------
@@ -634,7 +829,11 @@ def bake_sequence(data, output_paths):
 
         # ── 2. Build slate ────────────────────────────────────────────────────
         slate_path = os.path.join(tmpdir, "slate.png")
-        build_slate_png(data, slate_path, first, last, start_tc, out_w, out_h)
+        build_slate_png(
+            data, slate_path, first, last, start_tc, out_w, out_h,
+            tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
+            use_show_lut=use_show_lut, desqueeze_to=desqueeze_to,
+        )
 
         # ── 3. Build frame list for FFmpeg concat ─────────────────────────────
         # Slate = 1 frame (output index 0), then baked frames follow.

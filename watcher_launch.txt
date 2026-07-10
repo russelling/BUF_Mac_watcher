@@ -57,7 +57,15 @@ check() {
 check /opt/homebrew/bin/python3  "brew python - required by qt_watcher.py PYTHON3"
 check /opt/homebrew/bin/oiiotool "brew openimageio - required by qt_bake_oiio.py OIIOTOOL"
 check "$SG_PYTHON"               "Shotgun/Flow desktop app - launch it once if missing"
-check "$NUKE_EXECUTABLE"         "Nuke 17.0 - required by qt_watcher.py NUKE_EXECUTABLE (shot bakes)"
+
+# Nuke is NOT required: run_nuke_bake() in qt_watcher.py is deliberately
+# unused (all bakes route through the license-free OIIO+FFmpeg path).
+# Warn-only, in case the Nuke bake path is ever reactivated.
+if [ -e "$NUKE_EXECUTABLE" ]; then
+    echo "OK: $NUKE_EXECUTABLE"
+else
+    echo "NOTE: Nuke 17.0 not found ($NUKE_EXECUTABLE) - fine, the watcher's Nuke bake path is unused."
+fi
 
 # ffmpeg-full is version-pinned inside qt_bake_oiio.py; read the pinned path
 # from the script itself so this check never drifts out of sync with it.

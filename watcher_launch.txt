@@ -26,6 +26,12 @@ cat << 'EOF' > ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
     <key>StandardErrorPath</key>
     <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config/logs/qt_watcher_error.log</string>
 
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config/install/core/python</string>
+    </dict>
+
     <key>WorkingDirectory</key>
     <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts</string>
 </dict>

@@ -1,4 +1,94 @@
-mkdir -p "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config/logs"
+# QT Watcher installer — run with: bash watcher_launch.txt
+# Installs/verifies dependencies, writes the LaunchAgent plist, and loads it.
+
+REPO_DIR="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher"
+CONFIG_DIR="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config"
+SG_PYTHON="/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3"
+NUKE_EXECUTABLE="/Applications/Nuke17.0v1/Nuke17.0.app/Contents/MacOS/Nuke17.0"
+
+# ---------------------------------------------------------------------------
+# 1. Homebrew — install if missing
+# ---------------------------------------------------------------------------
+if ! command -v brew >/dev/null 2>&1 && [ ! -x /opt/homebrew/bin/brew ]; then
+    echo "Homebrew not found - installing (you may be prompted for your password)..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Make brew available in this shell even if the user's profile isn't set up yet
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+if ! command -v brew >/dev/null 2>&1; then
+    echo "ERROR: Homebrew install failed or not at /opt/homebrew (Apple Silicon expected). Aborting."
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Brew packages needed by qt_watcher.py / qt_bake_oiio.py
+#    python      -> /opt/homebrew/bin/python3   (runs qt_bake_oiio.py)
+#    openimageio -> /opt/homebrew/bin/oiiotool  (color bake / EXR metadata)
+#    ffmpeg-full -> drawtext-capable ffmpeg     (slate + burn-ins; core
+#                   'ffmpeg' formula lacks freetype, do NOT substitute it)
+# ---------------------------------------------------------------------------
+for formula in python openimageio ffmpeg-full; do
+    if ! brew list "$formula" >/dev/null 2>&1; then
+        echo "Installing $formula..."
+        brew install "$formula"
+    else
+        echo "OK: $formula already installed"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# 3. Verify every binary the watcher scripts reference actually exists
+# ---------------------------------------------------------------------------
+FAIL=0
+
+check() {
+    if [ -e "$1" ]; then
+        echo "OK: $1"
+    else
+        echo "MISSING: $1   ($2)"
+        FAIL=1
+    fi
+}
+
+check /opt/homebrew/bin/python3  "brew python - required by qt_watcher.py PYTHON3"
+check /opt/homebrew/bin/oiiotool "brew openimageio - required by qt_bake_oiio.py OIIOTOOL"
+check "$SG_PYTHON"               "Shotgun/Flow desktop app - launch it once if missing"
+check "$NUKE_EXECUTABLE"         "Nuke 17.0 - required by qt_watcher.py NUKE_EXECUTABLE (shot bakes)"
+
+# ffmpeg-full is version-pinned inside qt_bake_oiio.py; read the pinned path
+# from the script itself so this check never drifts out of sync with it.
+FFMPEG_PINNED=$(sed -n 's/^FFMPEG = "\(.*\)"/\1/p' "$REPO_DIR/scripts/qt_bake_oiio.py")
+if [ -n "$FFMPEG_PINNED" ]; then
+    if [ -e "$FFMPEG_PINNED" ]; then
+        echo "OK: $FFMPEG_PINNED"
+    else
+        echo "MISSING: $FFMPEG_PINNED"
+        echo "         qt_bake_oiio.py pins this exact ffmpeg-full version."
+        echo "         Installed versions:"
+        ls -1 /opt/homebrew/Cellar/ffmpeg-full/ 2>/dev/null | sed 's/^/           /'
+        echo "         -> Update the FFMPEG constant in scripts/qt_bake_oiio.py to match."
+        FAIL=1
+    fi
+else
+    echo "WARNING: could not read FFMPEG constant from qt_bake_oiio.py - check it manually."
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+    echo ""
+    echo "One or more dependencies are missing (see above). Fix them, then re-run:"
+    echo "    bash watcher_launch.txt"
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Logs folder + LaunchAgent
+# ---------------------------------------------------------------------------
+mkdir -p "$CONFIG_DIR/logs"
+mkdir -p ~/Library/LaunchAgents
 
 cat << 'EOF' > ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 <?xml version="1.0" encoding="UTF-8"?>
@@ -10,7 +100,7 @@ cat << 'EOF' > ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3.11</string>
+        <string>/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3</string>
         <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_watcher.py</string>
     </array>
 
@@ -37,6 +127,10 @@ cat << 'EOF' > ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 </dict>
 </plist>
 EOF
+
+plutil -lint ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist || exit 1
+
+launchctl unload ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist 2>/dev/null
 
 launchctl load ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 

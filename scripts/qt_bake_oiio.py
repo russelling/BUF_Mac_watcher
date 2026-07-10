@@ -63,13 +63,13 @@ LOGO_PATH = (
 
 OIIOTOOL = "/opt/homebrew/bin/oiiotool"
 
-# Point directly at the ffmpeg-full keg, NOT /opt/homebrew/bin/ffmpeg. The
+# Point at the ffmpeg-full formula, NOT /opt/homebrew/bin/ffmpeg. The
 # regular Homebrew 'ffmpeg' formula is built WITHOUT freetype, so it lacks the
 # 'drawtext' filter the slate and burn-ins require. 'ffmpeg-full' includes it.
-# Using the keg path avoids depending on which ffmpeg the PATH symlink happens
-# to resolve to (a future 'brew' op could flip it and silently break the
-# watcher). If ffmpeg-full is upgraded, update this version-pinned path.
-FFMPEG = "/opt/homebrew/Cellar/ffmpeg-full/8.1.2/bin/ffmpeg"
+# The /opt/homebrew/opt/ffmpeg-full symlink is formula-locked (it can only
+# ever resolve to ffmpeg-full's active keg, never a different ffmpeg) but is
+# version-independent, so brew upgrades and fresh installs never break it.
+FFMPEG = "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg"
 
 OCIO_CONFIG = "ocio://studio-config-latest"
 

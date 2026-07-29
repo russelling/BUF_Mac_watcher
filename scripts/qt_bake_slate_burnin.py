@@ -62,11 +62,11 @@ import nuke
 # ---------------------------------------------------------------------------
 
 SHOW_LUT_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/color/luts/"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/luts/"
     "ARRILogC4_SEV_S3_V3_digital_R709.cube"
 )
 LOGO_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/GLOBALS/logo/teardrop.png"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/logo/teardrop.png"
 )
 
 OCIO_ACES_WORKING = "ACES - ACEScg"

@@ -4,7 +4,7 @@ Source: https://github.com/russelling/BUF_Mac_watcher
 ("Render monitor and qt renderer for exr files.")
 
 QT Watcher runs as a **macOS LaunchAgent** (`com.buffalovfx.qtwatcher`) that
-executes `scripts/qt_watcher.py` using the Python 3.11 interpreter bundled
+executes `scripts/qt_watcher.py` using the Python interpreter bundled
 with the Shotgun/Flow desktop app.
 
 ## Everyday launch (agent already installed)
@@ -39,10 +39,13 @@ unloaded (e.g. after `launchctl unload`, or a fresh machine setup).
 launchctl list | grep qtwatcher
 ```
 
+Healthy: `<pid>  0  com.buffalovfx.qtwatcher`  
+Broken: `-  <nonzero>  com.buffalovfx.qtwatcher` (not running; last exit was an error)
+
 Logs:
 
-- Output: `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config/logs/qt_watcher.log`
-- Errors: `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config/logs/qt_watcher_error.log`
+- Output: `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/logs/qt_watcher.log`
+- Errors: `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/logs/qt_watcher_error.log`
 
 ## Stopping it
 
@@ -54,17 +57,17 @@ launchctl unload ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 
 1. Make sure the shared volume is mounted (`atv-post-lucid3`) and the repo
    exists at:
-   `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher`
+   `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher`
 2. In Terminal, run the installer script (it has no shebang, so invoke it
    with `bash`, not `./`):
 
    ```bash
-   cd "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher"
+   cd "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher"
    bash watcher_launch.txt
    ```
 
    This will:
-   - create the shared logs folder
+   - create the shared logs folder under `flow/current/logs`
    - write `~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist`
    - `launchctl load` it
    - confirm with `launchctl list | grep qtwatcher`
@@ -79,10 +82,11 @@ launchctl unload ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 ## What the LaunchAgent runs
 
 ```
-/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3.11 \
-  /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/scripts/qt_watcher.py
+/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3 \
+  /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_watcher.py
 ```
 
-Working directory: `.../BUF_Mac_watcher/scripts`
+Working directory: `.../BUF_Mac_watcher/scripts`  
+PYTHONPATH: `.../flow/current/install/core/python`
 
 Related scripts in the same folder: `qt_bake_oiio.py`, `qt_bake_slate_burnin.py`.

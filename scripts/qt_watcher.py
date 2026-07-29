@@ -39,7 +39,7 @@ import sgtk
 # Configuration
 # ---------------------------------------------------------------------------
 
-CONFIG_PATH = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config"
+CONFIG_PATH = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current"
 SHOTS_ROOT  = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots"
 ASSETS_ROOT = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets"
 
@@ -164,7 +164,7 @@ def resolve_asset_output_paths(tk, data):
         # Reuse editorial template if it exists, otherwise build path manually
     }
     editorial_dir = os.path.join(
-        "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/editorial",
+        "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial",
         "to_editorial",
         "%04d_%02d_%02d" % (now.year, now.month, now.day),
     )

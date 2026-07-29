@@ -54,11 +54,11 @@ import tempfile
 # ---------------------------------------------------------------------------
 
 SHOW_LUT_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/color/luts/"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/luts/"
     "ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube"
 )
 LOGO_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/GLOBALS/logo/teardrop_blk1.png"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/logo/teardrop_blk1.png"
 )
 
 OIIOTOOL = "/opt/homebrew/bin/oiiotool"

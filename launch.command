@@ -11,7 +11,7 @@ chmod +x ~/Desktop/start_qt_watcher.command
 # Icons live in a file's extended attributes, so regenerating the .command
 # above wipes any previously applied icon - reapply it every time.
 # ---------------------------------------------------------------------------
-ICON="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/buffalo_flow_config_alts/BUF_Mac_watcher/qt_watcher_icon.icns"
+ICON="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/qt_watcher_icon.icns"
 
 # Make brew visible even if the shell profile isn't set up yet
 if [ -x /opt/homebrew/bin/brew ]; then

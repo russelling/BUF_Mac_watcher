@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QSlider,
     QVBoxLayout,
 )
@@ -135,6 +136,9 @@ class ColorPreviewDialog(QDialog):
         self.view = QLabel()
         self.view.setAlignment(Qt.AlignCenter)
         self.view.setMinimumSize(VIEW_MIN_WIDTH, VIEW_MIN_HEIGHT)
+        # Without this the pixmap's size hint becomes the layout's floor and
+        # the window can no longer be made smaller once a frame is shown.
+        self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.view.setStyleSheet(
             "QLabel { background: #000; border: 1px solid #333; color: #777; }"
         )
@@ -460,16 +464,17 @@ class ColorPreviewDialog(QDialog):
         super().resizeEvent(event)
         self._rescale_view()
 
-    def closeEvent(self, event):
+    def _teardown(self):
+        """Let any in-flight oiiotool finish before its temp dir disappears."""
         self._queued = None
         if self._task is not None and self._task.isRunning():
             self._task.wait(5000)
         shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def closeEvent(self, event):
+        self._teardown()
         super().closeEvent(event)
 
     def done(self, result):
-        self._queued = None
-        if self._task is not None and self._task.isRunning():
-            self._task.wait(5000)
-        shutil.rmtree(self._tmpdir, ignore_errors=True)
+        self._teardown()
         super().done(result)

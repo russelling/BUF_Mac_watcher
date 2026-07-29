@@ -47,6 +47,12 @@ APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
+# ../scripts holds color_pipeline.py, shared with the Mac Studio bake so the
+# preview window and the watcher run the identical color pipeline.
+SCRIPTS_DIR = APP_DIR.parent / "scripts"
+if SCRIPTS_DIR.is_dir() and str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
 os.environ.setdefault(
     "PYTHONPATH",
     os.path.join(CONFIG_PATH, "install", "core", "python"),
@@ -84,6 +90,18 @@ from PySide6.QtWidgets import (
 
 import sgtk
 import staging
+
+# The preview needs the shared pipeline definition from ../scripts. A drop_app
+# deployed without that folder still works — the preview button just stays off.
+try:
+    import color_pipeline
+    import preview
+except ImportError as _preview_exc:  # pragma: no cover - deployment dependent
+    color_pipeline = None
+    preview = None
+    PREVIEW_IMPORT_ERROR = str(_preview_exc)
+else:
+    PREVIEW_IMPORT_ERROR = ""
 
 
 def get_sgtk():
@@ -147,6 +165,9 @@ class ReviewDropWindow(QMainWindow):
         self.tk = None
         self.sg = None
         self.media = None
+        # None = use the bake's defaults for this source type; a dict = the
+        # stage map an artist approved in the preview window.
+        self.color_stages = None
         self._episodes = []
         self._sequences = []
         self._shots = []
@@ -272,6 +293,10 @@ class ReviewDropWindow(QMainWindow):
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
+        self.btn_preview = QPushButton("Preview color…")
+        self.btn_preview.clicked.connect(self.open_preview)
+        self.btn_preview.setEnabled(False)
+        self.btn_preview.setMinimumHeight(34)
         self.btn_send = QPushButton("Send to QT Watcher")
         self.btn_send.clicked.connect(self.send_to_watcher)
         self.btn_send.setEnabled(False)
@@ -279,9 +304,11 @@ class ReviewDropWindow(QMainWindow):
         self.btn_ingest = QPushButton("Open 3D Ingest Folder")
         self.btn_ingest.clicked.connect(self.open_ingest)
         self.btn_ingest.setMinimumHeight(34)
+        btn_row.addWidget(self.btn_preview, 1)
         btn_row.addWidget(self.btn_send, 2)
         btn_row.addWidget(self.btn_ingest, 1)
         layout.addLayout(btn_row)
+        self._update_preview_button()
 
         self._log("Bootstrapping Flow…")
         try:
@@ -344,6 +371,7 @@ class ReviewDropWindow(QMainWindow):
         self.cmb_step.clear()
         for s in (SHOT_STEPS if is_shot else ASSET_STEPS):
             self.cmb_step.addItem(s)
+        self._update_preview_button()
 
     def _is_reference_mode(self):
         return self.cmb_delivery_type.currentText() == "Reference image"
@@ -366,6 +394,86 @@ class ReviewDropWindow(QMainWindow):
             self.btn_send.setText(
                 "Copy Reference to Shot" if is_reference else "Send to QT Watcher"
             )
+        self._update_preview_button()
+
+    # ── Color pipeline preview ─────────────────────────────────────────────
+
+    def _preview_unavailable_reason(self):
+        """Why the preview button is off, or None when it should be on."""
+        if preview is None:
+            return "Preview needs ../scripts/color_pipeline.py (%s)." % (
+                PREVIEW_IMPORT_ERROR or "not importable"
+            )
+        if not self.media:
+            return "Drop media first."
+        if self.media.get("media_type") == "model_3d":
+            return "3D deliveries don't go through the QT color pipe."
+        if self._is_reference_mode():
+            return "Reference images are copied untouched — nothing to preview."
+        if not preview.can_preview(self.media):
+            return "Movies are re-wrapped with burn-ins only, no color pipe."
+        return None
+
+    def _update_preview_button(self):
+        if not hasattr(self, "btn_preview"):
+            return
+        reason = self._preview_unavailable_reason()
+        self.btn_preview.setEnabled(reason is None)
+        self.btn_preview.setToolTip(
+            reason or "Check the color pipe frame by frame and switch stages off."
+        )
+        customized = bool(self.color_stages) and self.color_stages != (
+            color_pipeline.default_stages(self.media.get("skip_color"))
+            if (color_pipeline and self.media)
+            else None
+        )
+        self.btn_preview.setText(
+            "Preview color \u2022" if customized else "Preview color…"
+        )
+
+    def _preview_cdl_path(self):
+        """The .cc the bake would look for, so the preview grades identically."""
+        if color_pipeline is None or not self.radio_shot.isChecked():
+            return None
+        ep = self.cmb_episode.currentData()
+        seq = self.cmb_sequence.currentData()
+        shot = self.cmb_shot.currentData()
+        if not (ep and seq and shot):
+            return None
+        return color_pipeline.resolve_cdl_path(
+            ep["code"], seq["code"], shot["code"]
+        )
+
+    def _preview_context_note(self):
+        if self.radio_shot.isChecked():
+            shot = self.cmb_shot.currentData()
+            entity = shot["code"] if shot else "no shot selected"
+        else:
+            asset = self.cmb_asset.currentData()
+            entity = asset["code"] if asset else "no asset selected"
+        return "%s · %s v%s — switches here are saved with this submission." % (
+            entity,
+            self.cmb_step.currentText().strip() or "step",
+            self.txt_version.text().strip() or "1",
+        )
+
+    def open_preview(self):
+        if preview is None or not self.media:
+            return
+        dialog = preview.ColorPreviewDialog(
+            self.media,
+            cdl_path=self._preview_cdl_path(),
+            stages=self.color_stages,
+            context_note=self._preview_context_note(),
+            parent=self,
+        )
+        if dialog.exec():
+            self.color_stages = dialog.selected_stages()
+            self._log(
+                "Color pipeline: %s"
+                % color_pipeline.describe_stages(self.color_stages)
+            )
+        self._update_preview_button()
 
     def _load_submitted_for(self):
         if not self.sg:
@@ -496,6 +604,8 @@ class ReviewDropWindow(QMainWindow):
 
     def on_paths_dropped(self, paths):
         self.media = staging.classify_paths(paths)
+        # New media, new source type: start from the pipeline defaults again.
+        self.color_stages = None
         mt = self.media.get("media_type")
         if mt == "unknown":
             self.media_info.setText(
@@ -504,11 +614,13 @@ class ReviewDropWindow(QMainWindow):
             )
             self.btn_send.setEnabled(False)
             self.fields_box.setVisible(True)
+            self._update_preview_button()
             return
         if mt == "mixed":
             self.media_info.setText("Mixed media types — drop one type only.")
             self.btn_send.setEnabled(False)
             self.fields_box.setVisible(True)
+            self._update_preview_button()
             return
 
         if mt == "model_3d":
@@ -531,6 +643,7 @@ class ReviewDropWindow(QMainWindow):
             self.btn_send.setText("Send to 3D Ingest")
             self.media_info.setText(info)
             self.btn_send.setEnabled(True)
+            self._update_preview_button()
             self._log("Loaded 3D asset delivery")
             return
 
@@ -543,6 +656,7 @@ class ReviewDropWindow(QMainWindow):
                 "Reference mode accepts still images only; choose Version for movies."
             )
             self.btn_send.setEnabled(False)
+            self._update_preview_button()
             return
         self.btn_send.setText(
             "Copy Reference to Shot"
@@ -726,7 +840,8 @@ class ReviewDropWindow(QMainWindow):
             include_slate = self.chk_slate.isChecked()
             # Single-frame slate is optional; sequences default on but still respect checkbox
             flag_path = staging.stage_and_flag(
-                self.tk, self.sg, self.media, context, include_slate
+                self.tk, self.sg, self.media, context, include_slate,
+                color_stages=self.color_stages,
             )
             self._log("Staged + flag written:\n%s" % flag_path)
             QMessageBox.information(

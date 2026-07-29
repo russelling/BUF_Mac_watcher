@@ -150,6 +150,7 @@ def stage_and_flag(
     media: dict,
     context: dict,
     include_slate: bool,
+    color_stages: Optional[dict] = None,
 ) -> Path:
     """
     Copy media into the pipeline render/work area and write a
@@ -163,6 +164,10 @@ def stage_and_flag(
       step, version, submitted_for, description
       user_id, artist (optional — Flow HumanUser for Version.user)
       project_id, task_id (optional)
+
+    color_stages is the per-stage on/off map approved in the preview window
+    (see scripts/color_pipeline.py). None omits the key entirely, which the
+    bake reads as "use the defaults for this source type".
     """
     project_id = context["project_id"]
     step = context["step"]
@@ -242,6 +247,8 @@ def stage_and_flag(
             "task_id": context.get("task_id"),
             "source": "review_drop_app",
         }
+        if color_stages:
+            flag_data["color_stages"] = dict(color_stages)
     else:
         asset_code = context["entity"]["code"]
         asset_type = context["asset_type"]
@@ -311,6 +318,8 @@ def stage_and_flag(
             "task_id": context.get("task_id"),
             "source": "review_drop_app",
         }
+        if color_stages:
+            flag_data["color_stages"] = dict(color_stages)
 
     with open(flag_path, "w") as f:
         json.dump(flag_data, f, indent=2)

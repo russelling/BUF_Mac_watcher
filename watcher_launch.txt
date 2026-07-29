@@ -97,6 +97,9 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Logs folder + LaunchAgent
 # ---------------------------------------------------------------------------
+# Local logs only -- launchd often exits 78 if StandardOut/Err are on a
+# network volume that isn't ready when the agent loads.
+mkdir -p "$HOME/Library/Logs/buffalovfx"
 mkdir -p "$CONFIG_DIR/logs"
 mkdir -p ~/Library/LaunchAgents
 
@@ -109,3 +112,4 @@ launchctl unload ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist 2>/dev/nu
 launchctl load ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 
 launchctl list | grep qtwatcher
+echo "Healthy look: a numeric PID then 0 (not a dash then 78)."

@@ -39,13 +39,20 @@ unloaded (e.g. after `launchctl unload`, or a fresh machine setup).
 launchctl list | grep qtwatcher
 ```
 
-Healthy: `<pid>  0  com.buffalovfx.qtwatcher`  
-Broken: `-  <nonzero>  com.buffalovfx.qtwatcher` (not running; last exit was an error)
+Healthy example (PID is a number, status is 0):
+```
+12345  0  com.buffalovfx.qtwatcher
+```
+Broken (not running; last exit was an error):
+```
+-  78  com.buffalovfx.qtwatcher
+```
 
-Logs:
+Logs (local — avoid network paths here; launchd exit 78 is common when
+StandardOut/Err point at a share):
 
-- Output: `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/logs/qt_watcher.log`
-- Errors: `/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/logs/qt_watcher_error.log`
+- Output: `~/Library/Logs/buffalovfx/qt_watcher.log`
+- Errors: `~/Library/Logs/buffalovfx/qt_watcher_error.log`
 
 ## Stopping it
 

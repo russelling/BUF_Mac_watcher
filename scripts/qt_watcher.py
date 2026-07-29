@@ -121,9 +121,12 @@ def resolve_shot_output_paths(tk, data):
     output is absent. So we do NOT inject an output/nuke.output field here.
     """
     now = datetime.datetime.now()
+    # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
+    mid = data.get("sequence") or data.get("scene")
     fields = {
         "Episode":     data["episode"],
-        "Scene":       data["scene"],
+        "Sequence":    mid,
+        "Scene":       mid,  # legacy keys if any old templates remain
         "Shot":        data["shot_code"],
         "Step":        data["step"],
         "version":     data["version"],
@@ -266,6 +269,11 @@ def upload_version(sg, data, movie_path):
 
     if data.get("task_id"):
         version_data["sg_task"] = {"type": "Task", "id": data["task_id"]}
+
+    # Version.user = Artist / "submitted by" HumanUser from the drop app.
+    user_id = data.get("user_id")
+    if user_id:
+        version_data["user"] = {"type": "HumanUser", "id": int(user_id)}
 
     # Remove None / empty values
     version_data = {k: v for k, v in version_data.items() if v not in (None, "")}

@@ -54,11 +54,11 @@ import tempfile
 # ---------------------------------------------------------------------------
 
 SHOW_LUT_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/luts/"
-    "ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/"
+    "260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube"
 )
 LOGO_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/logo/teardrop_blk1.png"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/logo/teardrop_blk1.png"
 )
 
 OIIOTOOL = "/opt/homebrew/bin/oiiotool"
@@ -169,6 +169,8 @@ def frame_path(pattern, frame_num):
     Expand a frame pattern to an actual filename. Supports both #### and
     %04d style tokens (the flag's exr_path_pattern uses %04d).
     """
+    if not pattern:
+        return ""
     if "####" in pattern:
         return pattern.replace("####", "%04d" % frame_num)
     if "%04d" in pattern:
@@ -400,6 +402,22 @@ def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
     run(cmd, label="Color bake: %s" % os.path.basename(src_exr))
 
 
+def passthrough_frame(src_path, dst_png, desqueeze_to=None, fit_to=None):
+    """
+    Convert a display-referred still (PNG/JPG/TIFF/…) to an 8-bit PNG for
+    FFmpeg without the ACEScg show color pipe. Used when skip_color is set.
+    """
+    cmd = [OIIOTOOL, src_path]
+    if desqueeze_to is not None:
+        dw, dh = desqueeze_to
+        cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+    if fit_to is not None:
+        fw, fh = fit_to
+        cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+    cmd += ["--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
+    run(cmd, label="Passthrough: %s" % os.path.basename(src_path))
+
+
 def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size):
     """
     Same color pipeline as bake_frame (ACEScg -> LogC4 -> CDL -> Show LUT ->
@@ -440,6 +458,18 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size)
     cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
 
     run(cmd, label="Thumbnail bake: %s" % os.path.basename(src_exr))
+
+
+def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size):
+    """Resize a display-referred still for the slate collage (no color pipe)."""
+    cmd = [OIIOTOOL, src_path]
+    if desqueeze_to is not None:
+        dw, dh = desqueeze_to
+        cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+    w, h = size
+    cmd += ["--resize:filter=lanczos3", "%dx%d" % (w, h)]
+    cmd += ["--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
+    run(cmd, label="Thumbnail passthrough: %s" % os.path.basename(src_path))
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +568,8 @@ def _esc_drawtext(s):
 
 
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
-                     tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to):
+                     tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to,
+                     skip_color=False):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
     background, a row of three equal-size frame thumbnails (first/mid/last)
@@ -561,7 +592,7 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
     if is_shot:
         context_line = "%s / %s / %s" % (
             data.get("episode", ""),
-            data.get("scene", ""),
+            data.get("sequence") or data.get("scene", ""),
             data.get("shot_code", ""),
         )
     else:
@@ -630,18 +661,32 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
     )
 
     if have_thumbs:
-        bake_thumbnail(
-            frame_path(exr_pattern, frame_first_actual), thumb1_png,
-            cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
-        )
-        bake_thumbnail(
-            frame_path(exr_pattern, frame_mid_actual), thumb2_png,
-            cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
-        )
-        bake_thumbnail(
-            frame_path(exr_pattern, frame_last_actual), thumb3_png,
-            cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
-        )
+        if skip_color:
+            passthrough_thumbnail(
+                frame_path(exr_pattern, frame_first_actual), thumb1_png,
+                desqueeze_to, SBS_SIZE,
+            )
+            passthrough_thumbnail(
+                frame_path(exr_pattern, frame_mid_actual), thumb2_png,
+                desqueeze_to, SBS_SIZE,
+            )
+            passthrough_thumbnail(
+                frame_path(exr_pattern, frame_last_actual), thumb3_png,
+                desqueeze_to, SBS_SIZE,
+            )
+        else:
+            bake_thumbnail(
+                frame_path(exr_pattern, frame_first_actual), thumb1_png,
+                cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+            )
+            bake_thumbnail(
+                frame_path(exr_pattern, frame_mid_actual), thumb2_png,
+                cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+            )
+            bake_thumbnail(
+                frame_path(exr_pattern, frame_last_actual), thumb3_png,
+                cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+            )
     else:
         print(
             "[qt_bake_oiio] WARNING: could not find all of first/mid/last "
@@ -735,29 +780,45 @@ def bake_sequence(data, output_paths):
     """
     Full bake pipeline:
       1. Bake each EXR frame to a temp PNG with color transform
-      2. Build slate PNG
-      3. Concatenate slate + baked frames via FFmpeg
+         (or, for skip_color movie sources, pass frames/movie through)
+      2. Optionally build slate PNG
+      3. Concatenate slate + frames via FFmpeg
       4. Add burn-ins
       5. Encode to ProRes QT for each output path
+
+    Flag extras (optional, used by the Review Drop app):
+      include_slate  - bool, default True
+      skip_color     - bool, default False (MOV/QT sources)
+      movie_path     - path to an existing .mov/.mp4 when skip_color is True
     """
+    include_slate = data.get("include_slate", True)
+    skip_color = data.get("skip_color", False)
+    movie_path = data.get("movie_path")
+
+    if skip_color and movie_path:
+        bake_movie_passthrough(data, output_paths, movie_path, include_slate)
+        return
+
     exr_pattern = data.get("exr_path") or data.get("exr_path_pattern", "")
     first, last = get_frame_range(data)
 
     # Resolve the source start timecode (flag -> EXR -> frame-derived).
     start_tc, tc_source = resolve_start_timecode(data, exr_pattern, first)
     print("[qt_bake_oiio] Start TC: %s (source: %s)" % (start_tc, tc_source))
+    print("[qt_bake_oiio] include_slate=%s skip_color=%s" % (include_slate, skip_color))
 
     # CDL path (shots only — assets skip CDL). CDL is an optional creative
     # grade: if absent, skip it but log so it's visible that the QT is
     # ungraded.
     cdl_path = None
-    if is_shot_context(data):
+    if is_shot_context(data) and not skip_color:
         shot = data.get("shot_code", "")
         episode = str(data.get("episode", ""))
-        scene = str(data.get("scene", ""))
+        # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
+        mid = str(data.get("sequence") or data.get("scene") or "")
         cdl_guess = os.path.join(
             "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots",
-            episode, scene, shot, "plates", "%s.cc" % shot,
+            episode, mid, shot, "plates", "%s.cc" % shot,
         )
         if os.path.exists(cdl_guess):
             cdl_path = cdl_guess
@@ -765,13 +826,18 @@ def bake_sequence(data, output_paths):
         else:
             print("[qt_bake_oiio] CDL: none found at %s — baking UNGRADED" % cdl_guess)
     else:
-        print("[qt_bake_oiio] CDL: skipped (asset turntable)")
+        if skip_color:
+            print("[qt_bake_oiio] CDL/LUT: skipped (skip_color)")
+        else:
+            print("[qt_bake_oiio] CDL: skipped (asset turntable)")
 
     # Show LUT presence: decided once. If missing, fall back to a generic
     # LogC4->Rec.709 conversion (viewable, roughly correct) rather than
     # shipping flat log. Log it loudly since the look will differ from final.
-    use_show_lut = os.path.exists(SHOW_LUT_PATH)
-    if use_show_lut:
+    use_show_lut = (not skip_color) and os.path.exists(SHOW_LUT_PATH)
+    if skip_color:
+        use_show_lut = False
+    elif use_show_lut:
         print("[qt_bake_oiio] Show LUT: applying %s" % SHOW_LUT_PATH)
     else:
         print(
@@ -818,57 +884,56 @@ def bake_sequence(data, output_paths):
                 print("[qt_bake_oiio] WARNING: missing frame %s" % src)
                 continue
             dst = os.path.join(tmpdir, "frame_%04d.png" % frame_num)
-            bake_frame(
-                src, dst, cdl_path=cdl_path, use_show_lut=use_show_lut,
-                desqueeze_to=desqueeze_to, fit_to=fit_to,
-            )
+            if skip_color:
+                passthrough_frame(
+                    src, dst, desqueeze_to=desqueeze_to, fit_to=fit_to,
+                )
+            else:
+                bake_frame(
+                    src, dst, cdl_path=cdl_path, use_show_lut=use_show_lut,
+                    desqueeze_to=desqueeze_to, fit_to=fit_to,
+                )
             baked_frames.append(dst)
 
         if not baked_frames:
             raise RuntimeError("No frames were baked — check EXR path: %s" % exr_pattern)
 
-        # ── 2. Build slate ────────────────────────────────────────────────────
-        slate_path = os.path.join(tmpdir, "slate.png")
-        build_slate_png(
-            data, slate_path, first, last, start_tc, out_w, out_h,
-            tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
-            use_show_lut=use_show_lut, desqueeze_to=desqueeze_to,
-        )
+        # ── 2. Build slate (optional) ─────────────────────────────────────────
+        slate_path = None
+        if include_slate:
+            slate_path = os.path.join(tmpdir, "slate.png")
+            build_slate_png(
+                data, slate_path, first, last, start_tc, out_w, out_h,
+                tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
+                use_show_lut=use_show_lut, desqueeze_to=desqueeze_to,
+                skip_color=skip_color,
+            )
 
         # ── 3. Build frame list for FFmpeg concat ─────────────────────────────
-        # Slate = 1 frame (output index 0), then baked frames follow.
         concat_list = os.path.join(tmpdir, "frames.txt")
         with open(concat_list, "w") as f:
-            f.write("file '%s'\n" % slate_path)
-            f.write("duration %f\n" % (1.0 / FPS))
+            if slate_path:
+                f.write("file '%s'\n" % slate_path)
+                f.write("duration %f\n" % (1.0 / FPS))
             for baked in baked_frames:
                 f.write("file '%s'\n" % baked)
                 f.write("duration %f\n" % (1.0 / FPS))
-            # FFmpeg concat demuxer needs last file listed twice
             if baked_frames:
                 f.write("file '%s'\n" % baked_frames[-1])
 
-        # Burn-in frame offset: output index 0 is the slate, so the first
-        # image frame (output index 1) must read the real source 'first'.
-        # eif uses n (0-based). At n=1 we want 'first', so offset = first - 1.
-        burnin_offset = first - 1
-
-        # Burn-in timecode start: the slate occupies output frame 0, and
-        # drawtext starts counting timecode from output frame 0. So set the
-        # burn-in start TC one frame BEFORE the source start, so that the
-        # first image frame (output index 1) reads exactly start_tc.
-        start_tc_frames = tc_to_frames(start_tc)
-        if start_tc_frames is not None:
-            burnin_start_tc = frames_to_tc(start_tc_frames - 1)
+        if include_slate:
+            # Slate at output index 0; first image frame at index 1.
+            burnin_offset = first - 1
+            start_tc_frames = tc_to_frames(start_tc)
+            if start_tc_frames is not None:
+                burnin_start_tc = frames_to_tc(start_tc_frames - 1)
+            else:
+                burnin_start_tc = start_tc
         else:
-            # Unparseable TC - fall back to the raw value (burn-in still shows
-            # something rather than crashing).
+            burnin_offset = first
             burnin_start_tc = start_tc
 
         burnin_filters = build_drawtext_filters(data, burnin_offset, burnin_start_tc)
-
-        # Embedded SMPTE timecode track: same one-frame-back offset so the
-        # QT's TC track aligns with the first image frame, not the slate.
         embed_tc = burnin_start_tc
 
         # ── 4+5. Encode to ProRes QT with burn-ins and TC track ───────────────
@@ -896,6 +961,88 @@ def bake_sequence(data, output_paths):
             cmd.append(out_path)
 
             run(cmd, label="Encode QT: %s" % os.path.basename(out_path))
+            print("[qt_bake_oiio] Written: %s" % out_path)
+
+
+def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
+    """Re-wrap an existing MOV/MP4 with burn-ins (and optional slate). No OCIO."""
+    if not os.path.exists(movie_path):
+        raise RuntimeError("movie_path not found: %s" % movie_path)
+
+    print("[qt_bake_oiio] Movie passthrough (skip_color): %s" % movie_path)
+    print("[qt_bake_oiio] include_slate=%s" % include_slate)
+
+    first, last = get_frame_range(data)
+    start_tc = data.get("start_timecode") or "00:00:00:00"
+
+    fit = "scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2" % (
+        DELIVERY_WIDTH, DELIVERY_HEIGHT, DELIVERY_WIDTH, DELIVERY_HEIGHT
+    )
+
+    with tempfile.TemporaryDirectory(prefix="qt_bake_mov_") as tmpdir:
+        slate_path = None
+        if include_slate:
+            slate_path = os.path.join(tmpdir, "slate.png")
+            # Minimal slate without EXR thumbnails
+            build_slate_png(
+                data, slate_path, first, last, start_tc,
+                DELIVERY_WIDTH, DELIVERY_HEIGHT,
+                tmpdir=tmpdir, exr_pattern="", cdl_path=None,
+                use_show_lut=False, desqueeze_to=None,
+            )
+
+        if include_slate:
+            burnin_offset = first - 1
+            start_tc_frames = tc_to_frames(start_tc)
+            burnin_start_tc = (
+                frames_to_tc(start_tc_frames - 1)
+                if start_tc_frames is not None else start_tc
+            )
+        else:
+            burnin_offset = first
+            burnin_start_tc = start_tc
+
+        burnin_filters = build_drawtext_filters(data, burnin_offset, burnin_start_tc)
+        vf = "%s,%s" % (fit, burnin_filters)
+
+        for out_path in output_paths:
+            out_dir = os.path.dirname(out_path)
+            if out_dir and not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+
+            if slate_path:
+                # slate (1 frame) + movie
+                cmd = [
+                    FFMPEG, "-y",
+                    "-loop", "1", "-t", str(1.0 / FPS), "-i", slate_path,
+                    "-i", movie_path,
+                    "-filter_complex",
+                    "[0:v]%s[slate];[1:v]%s[mov];[slate][mov]concat=n=2:v=1:a=0[out]"
+                    % (fit, vf),
+                    "-map", "[out]",
+                    "-c:v", "prores_ks",
+                    "-profile:v", "3",
+                    "-vendor", "apl0",
+                    "-pix_fmt", "yuv422p10le",
+                    "-r", str(FPS),
+                    "-timecode", burnin_start_tc,
+                    out_path,
+                ]
+            else:
+                cmd = [
+                    FFMPEG, "-y",
+                    "-i", movie_path,
+                    "-vf", vf,
+                    "-c:v", "prores_ks",
+                    "-profile:v", "3",
+                    "-vendor", "apl0",
+                    "-pix_fmt", "yuv422p10le",
+                    "-r", str(FPS),
+                    "-timecode", burnin_start_tc,
+                    out_path,
+                ]
+
+            run(cmd, label="Encode QT (movie passthrough): %s" % os.path.basename(out_path))
             print("[qt_bake_oiio] Written: %s" % out_path)
 
 

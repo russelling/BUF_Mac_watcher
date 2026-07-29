@@ -27,11 +27,13 @@
     <key>KeepAlive</key>
     <true/>
 
+    <!-- Local logs only: launchd exit 78 is common when StandardOut/Err
+         point at a network volume that is slow/unavailable at load time. -->
     <key>StandardOutPath</key>
-    <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/logs/qt_watcher.log</string>
+    <string>/Users/mark.russell/Library/Logs/buffalovfx/qt_watcher.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/logs/qt_watcher_error.log</string>
+    <string>/Users/mark.russell/Library/Logs/buffalovfx/qt_watcher_error.log</string>
 
     <key>WorkingDirectory</key>
     <string>/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts</string>

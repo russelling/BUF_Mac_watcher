@@ -62,11 +62,11 @@ import nuke
 # ---------------------------------------------------------------------------
 
 SHOW_LUT_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/luts/"
-    "ARRILogC4_SEV_S3_V3_digital_R709.cube"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/"
+    "260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube"
 )
 LOGO_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/logo/teardrop.png"
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/logo/teardrop.png"
 )
 
 OCIO_ACES_WORKING = "ACES - ACEScg"
@@ -127,10 +127,11 @@ def build_color_bake(read_node, data):
     if is_shot_context(data):
         shot    = data.get("shot_code", "")
         episode = str(data.get("episode", ""))
-        scene   = str(data.get("scene", ""))
+        # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
+        mid = str(data.get("sequence") or data.get("scene") or "")
         cdl_path = os.path.join(
             "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots",
-            episode, scene, shot, "plates", "%s.cc" % shot,
+            episode, mid, shot, "plates", "%s.cc" % shot,
         )
         if os.path.exists(cdl_path):
             cdl = nuke.createNode("OCIOFileTransform", inpanel=False)
@@ -296,9 +297,10 @@ def build_slate(data, first_frame, last_frame):
         last = merge
 
     if is_shot:
+        mid = data.get("sequence") or data.get("scene") or ""
         context_line = "%s / %s / %s" % (
             data.get("episode", ""),
-            data.get("scene", ""),
+            mid,
             data.get("shot_code", ""),
         )
     else:

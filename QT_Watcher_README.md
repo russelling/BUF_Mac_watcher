@@ -96,4 +96,10 @@ launchctl unload ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 Working directory: `.../BUF_Mac_watcher/scripts`  
 PYTHONPATH: `.../flow/current/install/core/python`
 
-Related scripts in the same folder: `qt_bake_oiio.py`, `qt_bake_slate_burnin.py`.
+Related scripts in the same folder: `qt_bake_oiio.py`, `qt_bake_slate_burnin.py`,
+`color_pipeline.py`.
+
+`color_pipeline.py` holds the shared color/geometry pipeline — the oiiotool
+stage list, the show LUT and OCIO names, and the delivery size — used by both
+`qt_bake_oiio.py` and the Review Drop app's preview window. Change a colorspace
+or the show LUT path there and both follow.

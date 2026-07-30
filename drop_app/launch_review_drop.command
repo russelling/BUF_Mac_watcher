@@ -18,6 +18,15 @@ if [ ! -x "$SG_PYTHON" ]; then
   exit 1
 fi
 
+# Finder / Shotgun launches strip Homebrew from PATH. Preview needs
+# oiiotool + ffmpeg for EXR; put the usual prefixes back before exec.
+if [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -x /usr/local/bin/brew ]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+export PATH="/opt/homebrew/bin:/opt/homebrew/opt/ffmpeg-full/bin:/usr/local/bin:${PATH}"
+
 export PYTHONPATH="$CONFIG_CORE${PYTHONPATH:+:$PYTHONPATH}"
 cd "$APP_DIR" || exit 1
 
@@ -30,5 +39,7 @@ if command -v git >/dev/null 2>&1; then
   echo "[review_drop] $APP_DIR"
   echo "[review_drop] branch=$BRANCH commit=$COMMIT"
 fi
+echo "[review_drop] oiiotool=$(command -v oiiotool 2>/dev/null || echo NOT FOUND)"
+echo "[review_drop] ffmpeg=$(command -v ffmpeg 2>/dev/null || echo NOT FOUND)"
 
 exec "$SG_PYTHON" "$APP_DIR/review_drop_app.py"

@@ -108,24 +108,109 @@ class PipeOptions:
         return (self.log_convert, self.cdl, self.show_lut)
 
 
+def _homebrew_prefixes() -> list:
+    """Homebrew roots — Apple Silicon, Intel, and brew shellenv if present."""
+    prefixes = []
+    for key in ("HOMEBREW_PREFIX", "HOMEBREW_REPOSITORY"):
+        value = os.environ.get(key)
+        if value:
+            prefixes.append(value)
+    prefixes.extend(["/opt/homebrew", "/usr/local"])
+    # De-dupe, keep order.
+    seen = set()
+    ordered = []
+    for prefix in prefixes:
+        if prefix and prefix not in seen:
+            seen.add(prefix)
+            ordered.append(prefix)
+    return ordered
+
+
+def _login_shell_which(name: str) -> Optional[str]:
+    """
+    Ask the user's login shell where a tool lives.
+
+    Finder / Shotgun Desktop launches strip Homebrew from PATH, so
+    shutil.which misses tools that `zsh -lc` would find.
+    """
+    if sys.platform != "darwin":
+        return None
+    for shell in ("/bin/zsh", "/bin/bash"):
+        if not os.path.isfile(shell):
+            continue
+        try:
+            result = subprocess.run(
+                [shell, "-lc", "command -v %s" % name],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except Exception:
+            continue
+        path = (result.stdout or "").strip().splitlines()
+        if result.returncode == 0 and path:
+            candidate = path[0].strip()
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+    return None
+
+
 def find_tool(configured: str, name: str) -> Optional[str]:
-    """Locate a CLI tool: the bake's path first, then PATH, then Homebrew."""
+    """Locate a CLI tool across bake paths, PATH, Homebrew, and login shell."""
     if name in _TOOL_CACHE:
         return _TOOL_CACHE[name]
-    candidates = [
-        configured,
-        shutil.which(name),
-        "/opt/homebrew/bin/%s" % name,
-        "/usr/local/bin/%s" % name,
+
+    candidates = []
+    if configured:
+        candidates.append(configured)
+    which = shutil.which(name)
+    if which:
+        candidates.append(which)
+
+    for prefix in _homebrew_prefixes():
+        candidates.append(os.path.join(prefix, "bin", name))
+        # Formula-specific kegs used on the Mac Studio bake machine.
+        if name == "ffmpeg":
+            candidates.extend([
+                os.path.join(prefix, "opt", "ffmpeg-full", "bin", "ffmpeg"),
+                os.path.join(prefix, "opt", "ffmpeg", "bin", "ffmpeg"),
+            ])
+        if name == "oiiotool":
+            candidates.append(
+                os.path.join(prefix, "opt", "openimageio", "bin", "oiiotool")
+            )
+        if name == "ffprobe":
+            candidates.extend([
+                os.path.join(prefix, "opt", "ffmpeg-full", "bin", "ffprobe"),
+                os.path.join(prefix, "opt", "ffmpeg", "bin", "ffprobe"),
+            ])
+
+    candidates.extend([
         "/usr/bin/%s" % name,
-    ]
+        "/bin/%s" % name,
+    ])
+
     found = None
     for candidate in candidates:
         if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             found = candidate
             break
+    if not found:
+        found = _login_shell_which(name)
+
     _TOOL_CACHE[name] = found
     return found
+
+
+def tools_search_report() -> str:
+    """Short diagnostic for the status line when EXR decode can't start."""
+    oiio = find_tool(OIIOTOOL, "oiiotool")
+    ffmpeg = find_tool(FFMPEG, "ffmpeg")
+    parts = [
+        "oiiotool=%s" % (oiio or "NOT FOUND"),
+        "ffmpeg=%s" % (ffmpeg or "NOT FOUND"),
+    ]
+    return "  |  ".join(parts)
 
 
 def shot_cdl_path(episode: str, sequence: str, shot: str) -> Optional[str]:
@@ -292,9 +377,13 @@ class StillSource(FrameSource):
             return ""
         if find_tool(OIIOTOOL, "oiiotool") or find_tool(FFMPEG, "ffmpeg"):
             return ""
+        if sys.platform == "darwin" and os.path.isfile("/usr/bin/qlmanage"):
+            # Quick Look can still produce a thumbnail of many EXRs.
+            return ""
         return (
             "%s needs oiiotool or ffmpeg to decode, and neither was found on "
-            "this Mac (brew install openimageio ffmpeg)." % ext.upper().lstrip(".")
+            "this Mac (brew install openimageio ffmpeg).  %s"
+            % (ext.upper().lstrip("."), tools_search_report())
         )
 
 
@@ -461,7 +550,7 @@ def _convert_still(
     """
     pipe = pipe or PipeOptions()
     errors = []
-    for decoder in (_oiiotool_still, _ffmpeg_still):
+    for decoder in (_oiiotool_still, _ffmpeg_still, _qlmanage_still):
         try:
             result = decoder(src, dst, linear, cdl_path, pipe)
         except Exception as exc:
@@ -469,10 +558,10 @@ def _convert_still(
             continue
         if result:
             return result
+    detail = "; ".join(errors) if errors else tools_search_report()
     raise RuntimeError(
-        "; ".join(errors)
-        or "no decoder available for %s — install oiiotool or ffmpeg"
-        % src.suffix.upper().lstrip(".")
+        "no decoder available for %s — brew install openimageio ffmpeg "
+        "(%s)" % (src.suffix.upper().lstrip("."), detail)
     )
 
 
@@ -566,6 +655,48 @@ def _ffmpeg_still(src: Path, dst: Path, linear: bool, cdl_path, pipe: PipeOption
         if linear
         else "as delivered (display-referred)"
     ), "ffmpeg"
+
+
+def _qlmanage_still(src: Path, dst: Path, linear: bool, cdl_path, pipe: PipeOptions):
+    """
+    Last-resort macOS thumbnail via Quick Look.
+
+    Artist workstations sometimes lack Homebrew oiiotool/ffmpeg (those live on
+    the Mac Studio bake machine). qlmanage can still render many EXRs to PNG.
+    """
+    del cdl_path, pipe  # Quick Look cannot apply the show color pipe.
+    if sys.platform != "darwin":
+        return None
+    qlmanage = "/usr/bin/qlmanage"
+    if not os.path.isfile(qlmanage):
+        return None
+
+    out_dir = dst.parent / ("ql_" + dst.stem)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _run([qlmanage, "-t", "-s", "2048", "-o", str(out_dir), str(src)])
+
+    # qlmanage writes <filename>.png next to the original basename.
+    produced = None
+    for candidate in (
+        out_dir / (src.name + ".png"),
+        out_dir / (src.stem + ".png"),
+    ):
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            produced = candidate
+            break
+    if produced is None:
+        pngs = sorted(out_dir.glob("*.png"))
+        produced = pngs[0] if pngs else None
+    if produced is None:
+        raise RuntimeError("qlmanage produced no thumbnail for %s" % src.name)
+
+    shutil.copy2(produced, dst)
+    label = (
+        "Quick Look thumbnail (approx — not the delivered look)"
+        if linear
+        else "Quick Look thumbnail (approx)"
+    )
+    return label, "qlmanage"
 
 
 # ---------------------------------------------------------------------------

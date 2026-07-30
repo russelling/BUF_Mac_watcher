@@ -87,7 +87,10 @@ but it must not be mistaken for the real grade.
 Transparent areas are composited over a checkerboard, decoding runs off the
 UI thread so scrubbing stays responsive, and 3D drops say so rather than
 showing an empty frame. Preview needs `oiiotool` for EXR/DPX and `ffmpeg`
-for movies (`brew install openimageio ffmpeg`); PNG/JPG/TIFF need neither.
+for movies on this Mac (`brew install openimageio ffmpeg`) — the bake
+machine's install is not enough if you launch Review Drop on a workstation
+without those tools. PNG/JPG/TIFF need neither. If both are missing on
+macOS, Preview falls back to a Quick Look thumbnail and labels it `approx`.
 
 ### Flow record
 

@@ -6,8 +6,9 @@ drop folder.
 
 Branded square window (BUFFALO VFX, Manifold Extended Medium) with a
 compact two-column layout. The chrome follows a Lumon / Severance
-60-30-10 palette: cool institutional field, teal structure for panels and
-secondary actions, and red reserved for the primary send button.
+60-30-10 palette drawn from the MDR floor: white and pale gray field,
+sage / olive structure, navy reserved for the primary send button.
+Bottom row order is Preview → Send → Open 3D Ingest.
 
 ## What it does
 

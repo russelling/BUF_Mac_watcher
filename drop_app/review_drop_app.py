@@ -351,11 +351,11 @@ class ReviewDropWindow(QMainWindow):
         self.btn_ingest = QPushButton("Open 3D Ingest Folder")
         self.btn_ingest.clicked.connect(self.open_ingest)
         self.btn_ingest.setMinimumHeight(34)
-        btn_row.addWidget(self.btn_send, 3)
         btn_row.addWidget(self.btn_preview, 1)
+        btn_row.addWidget(self.btn_send, 3)
         btn_row.addWidget(self.btn_ingest, 2)
-        self.btn_send.setStyleSheet(theme.PRIMARY_BUTTON_CSS)
         self.btn_preview.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
+        self.btn_send.setStyleSheet(theme.PRIMARY_BUTTON_CSS)
         self.btn_ingest.setStyleSheet(theme.GHOST_BUTTON_CSS)
         layout.addLayout(btn_row)
 

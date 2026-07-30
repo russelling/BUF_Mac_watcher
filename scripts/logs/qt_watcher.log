@@ -9169,3 +9169,396 @@ RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/
 
 [2026-07-15 12:50:52] Uploaded Version 76920 (s112_Stairway_Set_turntable_turntable_v001)
 [2026-07-15 12:50:52] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Environment/s112_Stairway_Set/render/work/s112_Stairway_Set_turntable_v001/.render_complete_s112_Stairway_Set_turntable_v001.json
+[2026-07-29 09:48:01] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-07-29 13:09:16] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-07-29 13:15:47] Found 1 flag(s)
+[2026-07-29 13:15:47] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v104/.render_complete_301_019_010_temp_v104.json
+[2026-07-29 13:15:47] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v104/.render_complete_301_019_010_temp_v104.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v104.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v104.mov
+[2026-07-29 13:15:54] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v104/.render_complete_301_019_010_temp_v104.json
+[qt_bake_oiio] Start TC: 00:00:00:17 (source: frame-derived)
+[qt_bake_oiio] include_slate=False skip_color=False
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/plates/301_019_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: NOT FOUND at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/globals/luts/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube — falling back to display transform 'Gamma 2.2 Rec.709 - Display' / 'ACES 2.0 - SDR 100 nits (Rec.709)'. Look will differ from final show look.
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_efh2quvh
+[qt_bake_oiio] Color bake: 301_019_010_temp_v104.0017.exr
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v104.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v104.mov
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v104.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v104.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-29 13:15:57] Uploaded Version 77118 (301_019_010_temp_v104)
+[2026-07-29 13:15:57] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v104/.render_complete_301_019_010_temp_v104.json
+[2026-07-29 13:47:31] Found 1 flag(s)
+[2026-07-29 13:47:31] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_emile_fracturedFX_final/render/work/char_emile_fracturedFX_final_turntable_v001/.render_complete_char_emile_fracturedFX_final_turntable_v001.json
+[2026-07-29 13:47:31] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_emile_fracturedFX_final/render/work/char_emile_fracturedFX_final_turntable_v001/.render_complete_char_emile_fracturedFX_final_turntable_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_emile_fracturedFX_final/review/char_emile_fracturedFX_final_turntable_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/char_emile_fracturedFX_final_turntable_v001.mov
+[2026-07-29 13:48:10] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_emile_fracturedFX_final/render/work/char_emile_fracturedFX_final_turntable_v001/.render_complete_char_emile_fracturedFX_final_turntable_v001.json
+[qt_bake_oiio] Start TC: 00:00:00:01 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False
+[qt_bake_oiio] CDL: skipped (asset turntable)
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_u_axzdkg
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0001.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0002.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0003.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0004.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0005.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0006.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0007.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0008.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0009.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0010.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0011.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0012.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0013.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0014.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0015.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0016.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0017.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0018.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0019.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0020.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0021.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0022.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0023.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0024.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0025.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0026.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0027.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0028.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0029.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0030.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0031.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0032.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0033.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0034.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0035.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0036.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0037.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0038.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0039.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0040.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0041.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0042.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0043.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0044.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0045.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0046.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0047.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0048.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0049.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0050.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0051.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0052.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0053.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0054.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0055.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0056.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0057.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0058.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0059.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0060.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0061.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0062.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0063.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0064.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0065.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0066.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0067.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0068.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0069.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0070.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0071.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0072.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0073.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0074.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0075.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0076.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0077.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0078.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0079.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0080.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0081.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0082.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0083.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0084.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0085.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0086.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0087.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0088.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0089.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0090.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0091.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0092.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0093.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0094.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0095.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0096.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0097.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0098.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0099.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0100.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0101.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0102.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0103.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0104.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0105.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0106.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0107.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0108.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0109.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0110.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0111.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0112.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0113.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0114.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0115.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0116.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0117.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0118.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0119.exr
+[qt_bake_oiio] Color bake: char_emile_fracturedFX_final_turntable_v001.0120.exr
+[qt_bake_oiio] Thumbnail bake: char_emile_fracturedFX_final_turntable_v001.0001.exr
+[qt_bake_oiio] Thumbnail bake: char_emile_fracturedFX_final_turntable_v001.0060.exr
+[qt_bake_oiio] Thumbnail bake: char_emile_fracturedFX_final_turntable_v001.0120.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: char_emile_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_emile_fracturedFX_final/review/char_emile_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Encode QT: char_emile_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/char_emile_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-29 13:48:12] Uploaded Version 77119 (char_emile_fracturedFX_final_turntable_turntable_v001)
+[2026-07-29 13:48:12] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_emile_fracturedFX_final/render/work/char_emile_fracturedFX_final_turntable_v001/.render_complete_char_emile_fracturedFX_final_turntable_v001.json
+[2026-07-29 13:49:06] Found 1 flag(s)
+[2026-07-29 13:49:06] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-29 13:49:06] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v001.mov
+[2026-07-29 13:49:28] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[qt_bake_oiio] Movie passthrough (skip_color): /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/301_019_010_temp_v001.mov
+[qt_bake_oiio] include_slate=True
+[qt_bake_oiio] WARNING: could not find all of first/mid/last frames on disk for the slate thumbnail row - skipping thumbnails, slate will show title/text/strip only.
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT (movie passthrough): 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov
+[qt_bake_oiio] Encode QT (movie passthrough): 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-29 13:49:44] Uploaded Version 77120 (301_019_010_temp_v001)
+[2026-07-29 13:49:44] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-29 13:56:21] qt_watcher starting. Watching shots/ and assets/ every 30s
+[2026-07-29 14:06:53] Found 1 flag(s)
+[2026-07-29 14:06:54] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_goat_fracturedFX_final/render/work/char_goat_fracturedFX_final_turntable_v001/.render_complete_char_goat_fracturedFX_final_turntable_v001.json
+[2026-07-29 14:06:54] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_goat_fracturedFX_final/render/work/char_goat_fracturedFX_final_turntable_v001/.render_complete_char_goat_fracturedFX_final_turntable_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_goat_fracturedFX_final/review/char_goat_fracturedFX_final_turntable_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/char_goat_fracturedFX_final_turntable_v001.mov
+[2026-07-29 14:07:30] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_goat_fracturedFX_final/render/work/char_goat_fracturedFX_final_turntable_v001/.render_complete_char_goat_fracturedFX_final_turntable_v001.json
+[qt_bake_oiio] Start TC: 00:00:00:01 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False
+[qt_bake_oiio] CDL: skipped (asset turntable)
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_qr0b9e49
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0001.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0002.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0003.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0004.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0005.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0006.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0007.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0008.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0009.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0010.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0011.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0012.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0013.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0014.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0015.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0016.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0017.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0018.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0019.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0020.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0021.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0022.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0023.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0024.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0025.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0026.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0027.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0028.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0029.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0030.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0031.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0032.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0033.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0034.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0035.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0036.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0037.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0038.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0039.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0040.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0041.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0042.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0043.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0044.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0045.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0046.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0047.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0048.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0049.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0050.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0051.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0052.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0053.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0054.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0055.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0056.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0057.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0058.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0059.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0060.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0061.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0062.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0063.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0064.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0065.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0066.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0067.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0068.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0069.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0070.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0071.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0072.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0073.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0074.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0075.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0076.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0077.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0078.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0079.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0080.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0081.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0082.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0083.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0084.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0085.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0086.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0087.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0088.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0089.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0090.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0091.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0092.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0093.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0094.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0095.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0096.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0097.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0098.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0099.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0100.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0101.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0102.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0103.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0104.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0105.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0106.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0107.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0108.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0109.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0110.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0111.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0112.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0113.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0114.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0115.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0116.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0117.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0118.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0119.exr
+[qt_bake_oiio] Color bake: char_goat_fracturedFX_final_turntable_v001.0120.exr
+[qt_bake_oiio] Thumbnail bake: char_goat_fracturedFX_final_turntable_v001.0001.exr
+[qt_bake_oiio] Thumbnail bake: char_goat_fracturedFX_final_turntable_v001.0060.exr
+[qt_bake_oiio] Thumbnail bake: char_goat_fracturedFX_final_turntable_v001.0120.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: char_goat_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_goat_fracturedFX_final/review/char_goat_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Encode QT: char_goat_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/char_goat_fracturedFX_final_turntable_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-29 14:07:33] Uploaded Version 77121 (char_goat_fracturedFX_final_turntable_turntable_v001)
+[2026-07-29 14:07:33] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Character/char_goat_fracturedFX_final/render/work/char_goat_fracturedFX_final_turntable_v001/.render_complete_char_goat_fracturedFX_final_turntable_v001.json
+[2026-07-29 15:38:19] Found 1 flag(s)
+[2026-07-29 15:38:19] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-29 15:38:19] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v001.mov
+[2026-07-29 15:38:26] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[qt_bake_oiio] Start TC: 00:00:00:09 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/plates/301_019_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_syzffq2f
+[qt_bake_oiio] Color bake: 301_019_010_temp_v001.0009.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v001.0009.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v001.0009.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v001.0009.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-29 15:38:29] Uploaded Version 77122 (301_019_010_temp_v001)
+[2026-07-29 15:38:29] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-29 15:42:45] Found 1 flag(s)
+[2026-07-29 15:42:45] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-29 15:42:45] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v001.mov
+[2026-07-29 15:42:53] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[qt_bake_oiio] Start TC: 00:00:00:21 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/plates/301_019_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_lmewtsg7
+[qt_bake_oiio] Color bake: 301_019_010_temp_v001.0021.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v001.0021.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v001.0021.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v001.0021.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_29/301_019_010_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-29 15:42:55] Uploaded Version 77123 (301_019_010_temp_v001)
+[2026-07-29 15:42:55] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-30 12:04:21] Found 1 flag(s)
+[2026-07-30 12:04:21] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[2026-07-30 12:04:21] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_010_temp_v001.mov
+[2026-07-30 12:04:27] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json
+[qt_bake_oiio] Start TC: 00:00:41:17 (source: frame-derived)
+[qt_bake_oiio] include_slate=False skip_color=False
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/plates/301_019_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_pqcqe62c
+[qt_bake_oiio] Color bake: 301_019_010_temp_v001.1001.exr
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v001.mov
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_010_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 12:04:29] Uploaded Version 77180 (301_019_010_temp_v001)
+[2026-07-30 12:04:29] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v001/.render_complete_301_019_010_temp_v001.json

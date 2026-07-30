@@ -329,7 +329,10 @@ def stage_shot_reference(
 
     References do not create a render-complete flag or a Flow Version. The
     optional override replaces the source basename while preserving extension
-    and sequence frame numbers. Originals are also archived unchanged.
+    and sequence frame numbers; without an override the delivered filename is
+    kept as-is. Originals are archived unchanged, and the Step / Version /
+    Submitted by / Submitted for / Notes fields are recorded in a sidecar
+    JSON so the reference stays traceable without a Version entity.
     """
     if context.get("entity_type") != "Shot":
         raise ValueError("Reference images must be associated with a Shot.")
@@ -338,12 +341,14 @@ def stage_shot_reference(
     }:
         raise ValueError("Reference mode accepts still images only.")
 
+    step = (context.get("step") or "temp").strip() or "temp"
+    version = int(context.get("version") or 1)
     fields = {
         "Episode": context["episode"],
         "Sequence": context["sequence"],
         "Shot": context["entity"]["code"],
-        "Step": context.get("step") or "temp",
-        "version": int(context.get("version") or 1),
+        "Step": step,
+        "version": version,
     }
     try:
         tk.create_filesystem_structure("Shot", context["entity"]["id"])
@@ -369,7 +374,45 @@ def stage_shot_reference(
             )
         shutil.copy2(src, dest)
         copied.append(dest)
+
+    _write_reference_sidecar(reference_dir, copied, media, context, step, version)
     return copied
+
+
+def _write_reference_sidecar(
+    reference_dir: Path,
+    copied: list[Path],
+    media: dict,
+    context: dict,
+    step: str,
+    version: int,
+) -> Path:
+    """Record reference provenance alongside the copied files."""
+    stem = copied[0].stem if copied else "reference"
+    sidecar = reference_dir / ("%s.reference.json" % stem)
+    payload = {
+        "type": "shot_reference",
+        "project_id": context.get("project_id"),
+        "entity_type": "Shot",
+        "entity_id": context["entity"]["id"],
+        "shot_code": context["entity"]["code"],
+        "episode": context["episode"],
+        "sequence": context["sequence"],
+        "step": step,
+        "version": version,
+        "artist": context.get("artist") or getpass.getuser(),
+        "user_id": context.get("user_id"),
+        "submitted_for": context.get("submitted_for") or "",
+        "description": context.get("description") or "",
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "media_type": media.get("media_type"),
+        "originals": [f.name for f in media["files"]],
+        "references": [f.name for f in copied],
+        "source": "review_drop_app",
+    }
+    with open(sidecar, "w") as f:
+        json.dump(payload, f, indent=2)
+    return sidecar
 
 
 def stage_asset_ingest(

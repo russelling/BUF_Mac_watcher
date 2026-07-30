@@ -39,6 +39,59 @@ BRAND_FONT_PATH = (
     "ManifoldExtendedCF-Medium.otf"
 )
 
+PRIMARY_BUTTON_STYLE = """
+QPushButton {
+    background: #2d6cb4;
+    color: #ffffff;
+    border: 1px solid #3f82cf;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton:hover:enabled { background: #3782d6; border-color: #6aa9e8; }
+QPushButton:pressed:enabled {
+    background: #17456f;
+    border-color: #9ccbff;
+    padding-top: 10px;
+    padding-bottom: 6px;
+}
+QPushButton:disabled { background: #262626; color: #5c5c5c; border-color: #383838; }
+"""
+
+SECONDARY_BUTTON_STYLE = """
+QPushButton {
+    background: #333333;
+    color: #e6e6e6;
+    border: 1px solid #4a4a4a;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+}
+QPushButton:hover:enabled { background: #3e3e3e; border-color: #6a6a6a; }
+QPushButton:pressed:enabled {
+    background: #1c1c1c;
+    border-color: #9ccbff;
+    padding-top: 10px;
+    padding-bottom: 6px;
+}
+QPushButton:disabled { background: #262626; color: #5c5c5c; border-color: #383838; }
+"""
+
+DANGER_BUTTON_STYLE = """
+QPushButton {
+    background: #382628;
+    color: #e6b9bd;
+    border: 1px solid #5b383c;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 11px;
+}
+QPushButton:hover:enabled { background: #573237; color: #ffffff; border-color: #885159; }
+QPushButton:pressed:enabled { background: #241719; border-color: #d17b85; }
+QPushButton:disabled { background: #252525; color: #555555; border-color: #343434; }
+"""
+
 SHOT_STEPS = ["temp", "comp", "light", "fx", "anim", "editorial", "deliverable"]
 ASSET_STEPS = ["turntable", "model", "lookdev", "rig", "fx"]
 DEFAULT_SUBMITTED = ["Internal Review", "Supervisor", "Editorial", "Client"]
@@ -165,10 +218,22 @@ class ReviewDropWindow(QMainWindow):
         self.drop = DropZone(self.on_paths_dropped)
         layout.addWidget(self.drop)
 
+        media_row = QHBoxLayout()
+        media_row.setSpacing(8)
         self.media_info = QLabel("No media loaded.")
         self.media_info.setWordWrap(True)
         self.media_info.setStyleSheet("color: #9ecbff; font-size: 11px;")
-        layout.addWidget(self.media_info)
+        self.btn_remove_loaded = QPushButton("Remove Loaded")
+        self.btn_remove_loaded.setEnabled(False)
+        self.btn_remove_loaded.setCursor(Qt.PointingHandCursor)
+        self.btn_remove_loaded.setStyleSheet(DANGER_BUTTON_STYLE)
+        self.btn_remove_loaded.setToolTip(
+            "Remove the current drop from this app. Source files are not deleted."
+        )
+        self.btn_remove_loaded.clicked.connect(self.clear_loaded_media)
+        media_row.addWidget(self.media_info, 1)
+        media_row.addWidget(self.btn_remove_loaded)
+        layout.addLayout(media_row)
 
         # Entity type
         type_row = QHBoxLayout()
@@ -271,14 +336,18 @@ class ReviewDropWindow(QMainWindow):
         layout.addWidget(self.status)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
+        btn_row.setSpacing(10)
         self.btn_send = QPushButton("Send to QT Watcher")
         self.btn_send.clicked.connect(self.send_to_watcher)
         self.btn_send.setEnabled(False)
-        self.btn_send.setMinimumHeight(34)
+        self.btn_send.setMinimumHeight(40)
+        self.btn_send.setCursor(Qt.PointingHandCursor)
+        self.btn_send.setStyleSheet(PRIMARY_BUTTON_STYLE)
         self.btn_ingest = QPushButton("Open 3D Ingest Folder")
         self.btn_ingest.clicked.connect(self.open_ingest)
-        self.btn_ingest.setMinimumHeight(34)
+        self.btn_ingest.setMinimumHeight(40)
+        self.btn_ingest.setCursor(Qt.PointingHandCursor)
+        self.btn_ingest.setStyleSheet(SECONDARY_BUTTON_STYLE)
         btn_row.addWidget(self.btn_send, 2)
         btn_row.addWidget(self.btn_ingest, 1)
         layout.addLayout(btn_row)
@@ -321,7 +390,7 @@ class ReviewDropWindow(QMainWindow):
         brand = QLabel("BUFFALO VFX")
         brand.setFont(load_brand_font(24))
         brand.setStyleSheet("color: #ffffff;")
-        subtitle = QLabel("Review Drop")
+        subtitle = QLabel("Objects Submittable")
         subtitle.setStyleSheet("color: #7a7a7a; font-size: 11px;")
         text_col.addWidget(brand)
         text_col.addWidget(subtitle)
@@ -331,6 +400,24 @@ class ReviewDropWindow(QMainWindow):
 
     def _log(self, msg: str):
         self.status.append(msg)
+
+    def clear_loaded_media(self, checked=False, log_action=True):
+        """Remove the pending drop from the UI without touching source files."""
+        had_media = bool(self.media)
+        self.media = None
+        self.drop.setText(self.drop.IDLE)
+        self.media_info.setText("No media loaded.")
+        self.btn_remove_loaded.setEnabled(False)
+        self.btn_send.setEnabled(False)
+        self.btn_send.setText(
+            "Copy Reference to Shot"
+            if self._is_reference_mode()
+            else "Send to QT Watcher"
+        )
+        self.fields_box.setVisible(True)
+        self._on_delivery_type_changed()
+        if had_media and log_action:
+            self._log("Removed loaded media (source files unchanged).")
 
     def _on_type_changed(self):
         is_shot = self.radio_shot.isChecked()
@@ -353,15 +440,10 @@ class ReviewDropWindow(QMainWindow):
         if is_reference:
             self.radio_shot.setChecked(True)
         self.txt_name_override.setEnabled(is_reference)
-        for widget in (
-            self.cmb_step,
-            self.txt_version,
-            self.cmb_submitted_by,
-            self.cmb_submitted,
-            self.txt_description,
-            self.chk_slate,
-        ):
-            widget.setEnabled(not is_reference)
+        # Step / Version / Submitted by / Submitted for / Notes stay editable
+        # for references and are recorded in the reference sidecar. Only the
+        # slate is bake-only, so it has nothing to act on here.
+        self.chk_slate.setEnabled(not is_reference)
         if self.media and self.media.get("media_type") != "model_3d":
             self.btn_send.setText(
                 "Copy Reference to Shot" if is_reference else "Send to QT Watcher"
@@ -498,18 +580,23 @@ class ReviewDropWindow(QMainWindow):
         self.media = staging.classify_paths(paths)
         mt = self.media.get("media_type")
         if mt == "unknown":
+            self.media = None
             self.media_info.setText(
                 "Unsupported drop — need an image (PNG/JPG/TIFF/EXR…), "
                 "MOV, or a 3D file (OBJ, FBX, GLB, PLY, USD…)."
             )
+            self.btn_remove_loaded.setEnabled(False)
             self.btn_send.setEnabled(False)
             self.fields_box.setVisible(True)
             return
         if mt == "mixed":
             self.media_info.setText("Mixed media types — drop one type only.")
+            self.btn_remove_loaded.setEnabled(True)
             self.btn_send.setEnabled(False)
             self.fields_box.setVisible(True)
             return
+
+        self.btn_remove_loaded.setEnabled(True)
 
         if mt == "model_3d":
             names = ", ".join(f.name for f in self.media["files"][:3])
@@ -661,10 +748,26 @@ class ReviewDropWindow(QMainWindow):
             "entity": shot,
             "episode": ep["code"],
             "sequence": seq["code"],
-            "step": "temp",
-            "version": 1,
+            "step": self.cmb_step.currentText().strip() or "temp",
+            "version": int(self.txt_version.text().strip() or "1"),
+            "submitted_for": self.cmb_submitted.currentText().strip(),
+            "description": self.txt_description.text().strip(),
             "project_id": PROJECT_ID,
+            **self._submitted_by_fields(),
         }
+
+    def _begin_busy(self, label: str) -> str:
+        """Show immediate click feedback while a copy runs on the UI thread."""
+        previous = self.btn_send.text()
+        self.btn_send.setEnabled(False)
+        self.btn_send.setText(label)
+        self._log(label)
+        QApplication.processEvents()
+        return previous
+
+    def _end_busy(self, previous: str, succeeded: bool):
+        self.btn_send.setText(previous)
+        self.btn_send.setEnabled(not succeeded and bool(self.media))
 
     def send_to_watcher(self):
         if not self.media or not self.tk:
@@ -672,6 +775,7 @@ class ReviewDropWindow(QMainWindow):
 
         # 3D asset deliveries go straight to the ingest watch folder.
         if self.media.get("media_type") == "model_3d":
+            previous = self._begin_busy("Copying to 3D Ingest…")
             try:
                 asset_type = self.cmb_asset_type.currentText()
                 dest = staging.stage_asset_ingest(
@@ -685,16 +789,15 @@ class ReviewDropWindow(QMainWindow):
                     "The ingest watcher will convert + turntable them."
                     % (len(self.media["files"]), dest),
                 )
-                self.btn_send.setEnabled(False)
-                self.media = None
-                self.drop.setText(self.drop.IDLE)
-                self.media_info.setText("No media loaded.")
+                self.clear_loaded_media(log_action=False)
             except Exception as exc:
                 self._log("ERROR: %s" % exc)
+                self._end_busy(previous, False)
                 QMessageBox.critical(self, "Ingest failed", str(exc))
             return
 
         if self._is_reference_mode():
+            previous = self._begin_busy("Copying reference…")
             try:
                 context = self._gather_reference_context()
                 copied = staging.stage_shot_reference(
@@ -711,16 +814,15 @@ class ReviewDropWindow(QMainWindow):
                     "No Flow Version was created.\n\n%s"
                     % (len(copied), copied[0].parent),
                 )
-                self.btn_send.setEnabled(False)
-                self.media = None
-                self.drop.setText(self.drop.IDLE)
-                self.media_info.setText("No media loaded.")
                 self.txt_name_override.clear()
+                self.clear_loaded_media(log_action=False)
             except Exception as exc:
                 self._log("ERROR: %s" % exc)
+                self._end_busy(previous, False)
                 QMessageBox.critical(self, "Reference copy failed", str(exc))
             return
 
+        previous = self._begin_busy("Staging for QT Watcher…")
         try:
             context = self._gather_context()
             include_slate = self.chk_slate.isChecked()
@@ -729,6 +831,7 @@ class ReviewDropWindow(QMainWindow):
                 self.tk, self.sg, self.media, context, include_slate
             )
             self._log("Staged + flag written:\n%s" % flag_path)
+            self._end_busy(previous, True)
             QMessageBox.information(
                 self,
                 "Queued for QT Watcher",
@@ -736,8 +839,10 @@ class ReviewDropWindow(QMainWindow):
                 "The Mac Studio QT Watcher will pick this up on its next poll "
                 "(~30s).\n\nFlag:\n%s" % flag_path,
             )
+            self.clear_loaded_media(log_action=False)
         except Exception as exc:
             self._log("ERROR: %s" % exc)
+            self._end_busy(previous, False)
             QMessageBox.critical(self, "Send failed", str(exc))
 
     def open_ingest(self):

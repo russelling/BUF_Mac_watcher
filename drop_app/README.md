@@ -12,6 +12,8 @@ compact two-column layout.
 ### Review media (images / EXR / MOV)
 
 1. **Drag & drop** an image sequence, single still, EXR, or MOV/MP4
+   - **Remove Loaded** clears a pending drop before submission; it never
+     deletes the original files from disk.
 2. Pick **Shot** (Episode → Sequence → Shot) or **Asset** from Flow
 3. Set Step / Version / Submitted by / Submitted for / Notes
 4. Optional **Include slate** (especially useful for single frames)

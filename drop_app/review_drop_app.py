@@ -28,10 +28,11 @@ INGEST_FOLDER = (
 )
 PROJECT_ID = 1343
 
-# Branding assets
+# Branding assets. The inverted teardrop is the variant cut for dark
+# backgrounds, which is what this window's chrome is.
 LOGO_PATH = (
     "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/"
-    "shots/_globals/logo/teardrop.png"
+    "shots/_globals/logo/teardrop_blk1.png"
 )
 BRAND_FONT_PATH = (
     "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/"

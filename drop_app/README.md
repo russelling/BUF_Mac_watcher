@@ -5,7 +5,9 @@ into the existing QT Watcher pipeline, plus a shortcut to the 3D asset ingest
 drop folder.
 
 Branded square window (BUFFALO VFX, Manifold Extended Medium) with a
-compact two-column layout.
+compact two-column layout. The chrome follows a Lumon / Severance
+60-30-10 palette: cool institutional field, teal structure for panels and
+secondary actions, and red reserved for the primary send button.
 
 ## What it does
 
@@ -163,6 +165,7 @@ chmod +x ~/Desktop/Buffalo_Review_Drop.command
 | `review_drop_app.py` | PySide6 UI |
 | `staging.py` | Media detect, copy, flag write, Flow record |
 | `preview.py` | Preview window, frame decoding, show-LUT color pipe |
+| `theme.py` | Lumon 60-30-10 color tokens and stylesheets |
 | `launch_review_drop.command` | Launcher |
 
 Bake support for `include_slate` / `skip_color` / `movie_path` lives in

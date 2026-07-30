@@ -40,6 +40,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import theme
+
 # ---------------------------------------------------------------------------
 # Color pipeline — mirrors qt_bake_oiio.py
 # ---------------------------------------------------------------------------
@@ -545,7 +547,7 @@ class ImageCanvas(QLabel):
         self.setMouseTracking(True)
         self.setMinimumSize(320, 240)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.setStyleSheet("background: #141414;")
+        self.setStyleSheet(theme.PREVIEW_CANVAS_CSS)
         self._pixmap = None
         self._fit = True
         self._zoom = 1.0
@@ -623,8 +625,8 @@ class ImageCanvas(QLabel):
 # Preview window
 # ---------------------------------------------------------------------------
 
-LABEL_CSS = "color: #9a9a9a; font-size: 10px;"
-VALUE_CSS = "color: #9ecbff; font-size: 11px;"
+LABEL_CSS = theme.LABEL_CSS
+VALUE_CSS = theme.VALUE_CSS
 
 
 class PreviewWindow(QDialog):
@@ -635,7 +637,7 @@ class PreviewWindow(QDialog):
         self.setWindowFlag(Qt.Window, True)
         self.setWindowTitle("Buffalo Review Drop — Preview")
         self.resize(QSize(1040, 760))
-        self.setStyleSheet("QDialog { background: #1e1e1e; color: #ddd; }")
+        self.setStyleSheet(theme.APP_CSS)
 
         self._tmpdir = Path(tempfile.mkdtemp(prefix="review_drop_preview_"))
         self._pool = QThreadPool()
@@ -668,7 +670,7 @@ class PreviewWindow(QDialog):
         self.scroll.setWidget(self.canvas)
         self.scroll.setWidgetResizable(True)
         self.scroll.setAlignment(Qt.AlignCenter)
-        self.scroll.setStyleSheet("QScrollArea { border: 1px solid #333; }")
+        self.scroll.setStyleSheet(theme.PREVIEW_SCROLL_CSS)
         layout.addWidget(self.scroll, 1)
 
         layout.addLayout(self._build_frame_row())
@@ -700,6 +702,8 @@ class PreviewWindow(QDialog):
         row.addWidget(self.btn_next)
         row.addWidget(self.sld_frame, 1)
         row.addWidget(self.lbl_frame)
+        for button in (self.btn_prev, self.btn_next):
+            button.setStyleSheet(theme.GHOST_BUTTON_CSS)
         return row
 
     def _build_view_row(self) -> QHBoxLayout:
@@ -759,6 +763,10 @@ class PreviewWindow(QDialog):
         self.btn_external = QPushButton("Open Externally")
         self.btn_external.clicked.connect(self._open_externally)
         row.addWidget(self.btn_external)
+
+        for button in (btn_reset, self.btn_fit, btn_zoom_out, btn_zoom_in):
+            button.setStyleSheet(theme.GHOST_BUTTON_CSS)
+        self.btn_external.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
         return row
 
     # -- public API ----------------------------------------------------------

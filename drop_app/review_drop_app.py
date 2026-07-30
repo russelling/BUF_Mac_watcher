@@ -28,11 +28,11 @@ INGEST_FOLDER = (
 )
 PROJECT_ID = 1343
 
-# Branding assets. The inverted teardrop is the variant cut for dark
-# backgrounds, which is what this window's chrome is.
+# Branding assets. The dark teardrop sits on the light Lumon field;
+# the inverted cut is reserved for the slate bake's black backgrounds.
 LOGO_PATH = (
     "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/"
-    "shots/_globals/logo/teardrop_blk1.png"
+    "shots/_globals/logo/teardrop.png"
 )
 BRAND_FONT_PATH = (
     "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/"
@@ -87,6 +87,7 @@ from PySide6.QtWidgets import (
 import sgtk
 import preview
 import staging
+import theme
 
 
 def get_sgtk():
@@ -113,19 +114,6 @@ def load_brand_font(default_size: int = 22) -> QFont:
 PLACEHOLDER = "— select —"
 NO_EPISODE = "  (no episode)"
 NO_SEQUENCE = "  (no sequence)"
-
-BUTTON_CSS = """
-QPushButton {
-    background: #2f2f2f;
-    color: #e6e6e6;
-    border: 1px solid #4a4a4a;
-    border-radius: 10px;
-    padding: 6px 14px;
-}
-QPushButton:hover { background: #3a3a3a; border-color: #5f5f5f; }
-QPushButton:pressed { background: #262626; border-color: #6f6f6f; }
-QPushButton:disabled { background: #242424; color: #5a5a5a; border-color: #333; }
-"""
 
 
 def _searchable_combo() -> QComboBox:
@@ -169,20 +157,22 @@ class DropZone(QLabel):
         self._on_double_click = on_double_click
         self.setAcceptDrops(True)
         self.setAlignment(Qt.AlignCenter)
-        self.setMinimumHeight(84)
+        self.setMinimumHeight(96)
         self.setWordWrap(True)
-        self.setStyleSheet(
-            "QLabel { border: 2px dashed #666; border-radius: 8px; "
-            "background: #2a2a2a; color: #bbb; padding: 8px; font-size: 12px; }"
-        )
+        self.setStyleSheet(theme.DROP_ZONE_IDLE)
         self.setText(self.IDLE)
         self.setToolTip("Double-click to preview the loaded media.")
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
+            self.setStyleSheet(theme.DROP_ZONE_ACTIVE)
             event.acceptProposedAction()
 
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet(theme.DROP_ZONE_IDLE)
+
     def dropEvent(self, event: QDropEvent):
+        self.setStyleSheet(theme.DROP_ZONE_IDLE)
         paths = []
         for url in event.mimeData().urls():
             local = url.toLocalFile()
@@ -200,7 +190,7 @@ class ReviewDropWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Buffalo Review Drop")
-        self.setFixedSize(QSize(640, 640))
+        self.setFixedSize(QSize(660, 700))
 
         self.tk = None
         self.sg = None
@@ -217,8 +207,9 @@ class ReviewDropWindow(QMainWindow):
         self._shot_sequence_field = None
 
         root = QWidget()
-        root.setStyleSheet("QWidget { background: #1e1e1e; color: #ddd; }")
+        root.setObjectName("root")
         self.setCentralWidget(root)
+        self.setStyleSheet(theme.APP_CSS)
         layout = QVBoxLayout(root)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(8)
@@ -230,7 +221,7 @@ class ReviewDropWindow(QMainWindow):
 
         self.media_info = QLabel("No media loaded.")
         self.media_info.setWordWrap(True)
-        self.media_info.setStyleSheet("color: #9ecbff; font-size: 11px;")
+        self.media_info.setStyleSheet(theme.MEDIA_INFO_CSS)
         layout.addWidget(self.media_info)
 
         # Entity type
@@ -333,7 +324,7 @@ class ReviewDropWindow(QMainWindow):
         self.chk_flow_record.toggled.connect(self._on_record_toggled)
         self.lbl_record_hint = QLabel("")
         self.lbl_record_hint.setWordWrap(True)
-        self.lbl_record_hint.setStyleSheet("color: #7a7a7a; font-size: 10px;")
+        self.lbl_record_hint.setStyleSheet(theme.HINT_CSS)
         record_row.addWidget(self.chk_flow_record)
         record_row.addWidget(self.lbl_record_hint, 1)
         layout.addLayout(record_row)
@@ -341,10 +332,7 @@ class ReviewDropWindow(QMainWindow):
         self.status = QTextEdit()
         self.status.setReadOnly(True)
         self.status.setFixedHeight(84)
-        self.status.setStyleSheet(
-            "QTextEdit { background: #141414; color: #9a9a9a; "
-            "font-size: 10px; border: 1px solid #333; }"
-        )
+        self.status.setStyleSheet(theme.STATUS_CSS)
         layout.addWidget(self.status)
 
         btn_row = QHBoxLayout()
@@ -366,8 +354,9 @@ class ReviewDropWindow(QMainWindow):
         btn_row.addWidget(self.btn_send, 3)
         btn_row.addWidget(self.btn_preview, 1)
         btn_row.addWidget(self.btn_ingest, 2)
-        for button in (self.btn_send, self.btn_preview, self.btn_ingest):
-            button.setStyleSheet(BUTTON_CSS)
+        self.btn_send.setStyleSheet(theme.PRIMARY_BUTTON_CSS)
+        self.btn_preview.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
+        self.btn_ingest.setStyleSheet(theme.GHOST_BUTTON_CSS)
         layout.addLayout(btn_row)
 
         self._update_modes()
@@ -409,9 +398,9 @@ class ReviewDropWindow(QMainWindow):
         text_col.setSpacing(0)
         brand = QLabel("BUFFALO VFX")
         brand.setFont(load_brand_font(24))
-        brand.setStyleSheet("color: #ffffff;")
-        subtitle = QLabel("Review Drop")
-        subtitle.setStyleSheet("color: #7a7a7a; font-size: 11px;")
+        brand.setStyleSheet(theme.BRAND_CSS)
+        subtitle = QLabel("REVIEW DROP")
+        subtitle.setStyleSheet(theme.SUBTITLE_CSS)
         text_col.addWidget(brand)
         text_col.addWidget(subtitle)
         header.addLayout(text_col)

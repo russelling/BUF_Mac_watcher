@@ -22,13 +22,33 @@ compact two-column layout.
 Accepted stills: `exr, hdr, png, jpg, jpeg, tif, tiff, tga, bmp, dpx, cin,
 gif, webp, psd, iff, sxr`. Drop one extension at a time (no mixed PNG+JPG).
 
-### Reference images and original sources
+### Reference media and original sources
 
-Choose **Reference image** as the Delivery type to copy stills directly into
-the selected Shot's `reference/` folder without creating a Flow Version.
+Choose **Reference** as the Delivery type to copy stills or a QT straight
+into the selected Shot's (or Asset's) `reference/` folder, skipping the bake.
 **Naming override** is optional: it replaces the basename while preserving
 the source extension and sequence frame numbers. Unchanged originals are
 also retained under `reference/source/`.
+
+### Flow record
+
+**Create Flow record** makes a Version in Flow Production Tracking for
+deliveries the QT Watcher never sees — a reference image, a reference QT, or
+a 3D asset drop. The record links to the selected Shot or Asset, points at
+the copied pipeline path, and carries Submitted by / Submitted for / Notes,
+so those fields stay editable whenever the box is ticked.
+
+| Delivery | Record |
+|----------|--------|
+| Version | Always — the QT Watcher creates it after the bake (option locked on) |
+| Reference image / QT | Optional — image or QT is uploaded as the thumbnail and viewable |
+| 3D asset drop | Optional — Version on the chosen Asset pointing at the ingest copy |
+
+EXR / HDR and 3D files can't be transcoded by Flow, so those records link to
+the path only and the app says so in the confirmation. A 3D record needs an
+Asset selected; without one the drop is refused rather than copied with no
+record. If a record fails after the files land, the copy stands and the error
+is reported instead of being rolled back.
 
 For normal Version deliveries, the untouched original files are archived
 under the selected Shot at:
@@ -40,8 +60,9 @@ under the selected Shot at:
 Drop a 3D file directly on the window. The app switches to **Asset** mode;
 pick the **Asset Type** and click **Send to 3D Ingest** — the file is copied
 into the ingest watch folder under that type, where the ingest watcher
-converts and turntables it. (The **Open 3D Ingest Folder** button still opens
-the drop folder in Finder for manual/bulk deliveries.)
+converts and turntables it. Tick **Create Flow record** to also log the
+delivery against a Flow Asset. (The **Open 3D Ingest Folder** button still
+opens the drop folder in Finder for manual/bulk deliveries.)
 
 Recognized 3D formats: `obj, fbx, glb, gltf, ply, stl, abc, usd, usdc, usda,
 usdz, max, blend`.
@@ -90,7 +111,7 @@ chmod +x ~/Desktop/Buffalo_Review_Drop.command
 | File | Role |
 |------|------|
 | `review_drop_app.py` | PySide6 UI |
-| `staging.py` | Media detect, copy, flag write |
+| `staging.py` | Media detect, copy, flag write, Flow record |
 | `launch_review_drop.command` | Launcher |
 
 Bake support for `include_slate` / `skip_color` / `movie_path` lives in

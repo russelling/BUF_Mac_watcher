@@ -152,6 +152,7 @@ class ReviewDropWindow(QMainWindow):
         self._shots = []
         self._assets = []
         self._users = []
+        self._record_pref = False
 
         root = QWidget()
         root.setStyleSheet("QWidget { background: #1e1e1e; color: #ddd; }")
@@ -233,10 +234,8 @@ class ReviewDropWindow(QMainWindow):
         for s in SHOT_STEPS:
             self.cmb_step.addItem(s)
         self.cmb_delivery_type = QComboBox()
-        self.cmb_delivery_type.addItems(["Version", "Reference image"])
-        self.cmb_delivery_type.currentIndexChanged.connect(
-            self._on_delivery_type_changed
-        )
+        self.cmb_delivery_type.addItems(["Version", "Reference"])
+        self.cmb_delivery_type.currentIndexChanged.connect(self._update_modes)
         self.txt_name_override = QLineEdit()
         self.txt_name_override.setPlaceholderText("Optional reference filename")
         self.txt_name_override.setEnabled(False)
@@ -261,6 +260,22 @@ class ReviewDropWindow(QMainWindow):
 
         layout.addLayout(body)
 
+        # Flow record option — applies to deliveries the QT Watcher never sees.
+        record_row = QHBoxLayout()
+        record_row.setSpacing(8)
+        self.chk_flow_record = QCheckBox("Create Flow record")
+        self.chk_flow_record.setToolTip(
+            "Create a Version in Flow Production Tracking linked to the "
+            "selected Shot or Asset, with the media uploaded for review."
+        )
+        self.chk_flow_record.toggled.connect(self._on_record_toggled)
+        self.lbl_record_hint = QLabel("")
+        self.lbl_record_hint.setWordWrap(True)
+        self.lbl_record_hint.setStyleSheet("color: #7a7a7a; font-size: 10px;")
+        record_row.addWidget(self.chk_flow_record)
+        record_row.addWidget(self.lbl_record_hint, 1)
+        layout.addLayout(record_row)
+
         self.status = QTextEdit()
         self.status.setReadOnly(True)
         self.status.setFixedHeight(84)
@@ -282,6 +297,8 @@ class ReviewDropWindow(QMainWindow):
         btn_row.addWidget(self.btn_send, 2)
         btn_row.addWidget(self.btn_ingest, 1)
         layout.addLayout(btn_row)
+
+        self._update_modes()
 
         self._log("Bootstrapping Flow…")
         try:
@@ -334,38 +351,82 @@ class ReviewDropWindow(QMainWindow):
 
     def _on_type_changed(self):
         is_shot = self.radio_shot.isChecked()
-        if not is_shot and self._is_reference_mode():
-            self.cmb_delivery_type.setCurrentIndex(0)
         self.shot_box.setVisible(is_shot)
         self.asset_box.setVisible(not is_shot)
-        # 3D deliveries are asset-only; keep review fields for media.
-        is_model = bool(self.media) and self.media.get("media_type") == "model_3d"
-        self.fields_box.setVisible(not is_model)
         self.cmb_step.clear()
         for s in (SHOT_STEPS if is_shot else ASSET_STEPS):
             self.cmb_step.addItem(s)
+        self._update_modes()
 
     def _is_reference_mode(self):
-        return self.cmb_delivery_type.currentText() == "Reference image"
+        return self.cmb_delivery_type.currentText() == "Reference"
 
-    def _on_delivery_type_changed(self):
-        is_reference = self._is_reference_mode()
-        if is_reference:
-            self.radio_shot.setChecked(True)
+    def _is_model_mode(self):
+        return bool(self.media) and self.media.get("media_type") == "model_3d"
+
+    def _on_record_toggled(self, checked: bool):
+        if self.chk_flow_record.isEnabled():
+            self._record_pref = checked
+        self._update_modes()
+
+    def _update_modes(self, *_args):
+        """Sync field states, button text, and the Flow record hint."""
+        is_model = self._is_model_mode()
+        is_reference = self._is_reference_mode() and not is_model
+        is_shot = self.radio_shot.isChecked()
+
+        # A Version delivery always ends up in Flow — the QT Watcher creates
+        # that record after the bake — so the option is only ours to make for
+        # references and 3D ingest drops.
+        record_optional = is_reference or is_model
+        wants_record = self._record_pref if record_optional else True
+        self.chk_flow_record.blockSignals(True)
+        self.chk_flow_record.setChecked(wants_record)
+        self.chk_flow_record.setEnabled(record_optional)
+        self.chk_flow_record.blockSignals(False)
+
+        self.cmb_delivery_type.setEnabled(not is_model)
+        self.fields_box.setVisible(not is_model or wants_record)
         self.txt_name_override.setEnabled(is_reference)
+        for widget in (self.cmb_step, self.txt_version, self.chk_slate):
+            widget.setEnabled(not record_optional)
+        # These fields populate the Flow record, so they stay live whenever
+        # one is being created.
         for widget in (
-            self.cmb_step,
-            self.txt_version,
             self.cmb_submitted_by,
             self.cmb_submitted,
             self.txt_description,
-            self.chk_slate,
         ):
-            widget.setEnabled(not is_reference)
-        if self.media and self.media.get("media_type") != "model_3d":
+            widget.setEnabled(not record_optional or wants_record)
+
+        if is_model:
+            self.btn_send.setText("Send to 3D Ingest")
+        elif is_reference:
             self.btn_send.setText(
-                "Copy Reference to Shot" if is_reference else "Send to QT Watcher"
+                "Copy Reference to %s" % ("Shot" if is_shot else "Asset")
             )
+        else:
+            self.btn_send.setText("Send to QT Watcher")
+        self.lbl_record_hint.setText(self._record_hint(is_model, is_reference))
+
+    def _record_hint(self, is_model: bool, is_reference: bool) -> str:
+        wants_record = self.chk_flow_record.isChecked()
+        entity = "Shot" if self.radio_shot.isChecked() else "Asset"
+        if is_model:
+            if wants_record:
+                return (
+                    "Version created on the selected Asset, linked to the "
+                    "ingest copy."
+                )
+            return "Files land in the ingest folder only — nothing in Flow yet."
+        if is_reference:
+            if wants_record:
+                return (
+                    "Version created on the selected %s with the reference "
+                    "uploaded for review." % entity
+                )
+            return "Files land in the reference folder only — nothing in Flow."
+        return "QT Watcher creates the Flow Version after the bake."
 
     def _load_submitted_for(self):
         if not self.sg:
@@ -497,18 +558,16 @@ class ReviewDropWindow(QMainWindow):
     def on_paths_dropped(self, paths):
         self.media = staging.classify_paths(paths)
         mt = self.media.get("media_type")
-        if mt == "unknown":
+        if mt in ("unknown", "mixed"):
             self.media_info.setText(
-                "Unsupported drop — need an image (PNG/JPG/TIFF/EXR…), "
+                "Mixed media types — drop one type only."
+                if mt == "mixed"
+                else "Unsupported drop — need an image (PNG/JPG/TIFF/EXR…), "
                 "MOV, or a 3D file (OBJ, FBX, GLB, PLY, USD…)."
             )
+            self.media = None
             self.btn_send.setEnabled(False)
-            self.fields_box.setVisible(True)
-            return
-        if mt == "mixed":
-            self.media_info.setText("Mixed media types — drop one type only.")
-            self.btn_send.setEnabled(False)
-            self.fields_box.setVisible(True)
+            self._update_modes()
             return
 
         if mt == "model_3d":
@@ -527,32 +586,14 @@ class ReviewDropWindow(QMainWindow):
             # Force Asset mode; 3D isn't review media.
             self.radio_asset.setChecked(True)
             self.cmb_delivery_type.setCurrentIndex(0)
-            self.fields_box.setVisible(False)
-            self.btn_send.setText("Send to 3D Ingest")
             self.media_info.setText(info)
             self.btn_send.setEnabled(True)
+            self._update_modes()
             self._log("Loaded 3D asset delivery")
             return
 
-        # Any non-3D drop uses the review/QT-watcher path.
-        self.fields_box.setVisible(True)
-        if self._is_reference_mode() and mt not in {
-            "exr_single", "exr_sequence", "image_single", "image_sequence",
-        }:
-            self.media_info.setText(
-                "Reference mode accepts still images only; choose Version for movies."
-            )
-            self.btn_send.setEnabled(False)
-            return
-        self.btn_send.setText(
-            "Copy Reference to Shot"
-            if self._is_reference_mode()
-            else "Send to QT Watcher"
-        )
-
         if mt == "movie":
             info = "Movie: %s (color bake skipped)" % self.media["movie_path"]
-            self.chk_slate.setEnabled(True)
         elif mt in ("exr_single", "image_single"):
             color_note = (
                 "full color pipe"
@@ -568,7 +609,6 @@ class ReviewDropWindow(QMainWindow):
                     color_note,
                 )
             )
-            self.chk_slate.setEnabled(True)
         else:
             color_note = (
                 "full color pipe"
@@ -585,11 +625,10 @@ class ReviewDropWindow(QMainWindow):
                     color_note,
                 )
             )
-            self.chk_slate.setEnabled(True)
             self.chk_slate.setChecked(True)
 
         self.media_info.setText(info)
-        self._on_delivery_type_changed()
+        self._update_modes()
         self.btn_send.setEnabled(True)
         self._log("Loaded %s" % mt)
 
@@ -648,47 +687,124 @@ class ReviewDropWindow(QMainWindow):
             **submitted_by,
         }
 
-    def _gather_reference_context(self):
-        if not self.radio_shot.isChecked():
-            raise ValueError("Reference images must be associated with a Shot.")
-        ep = self.cmb_episode.currentData()
-        seq = self.cmb_sequence.currentData()
-        shot = self.cmb_shot.currentData()
-        if not (ep and seq and shot):
-            raise ValueError("Select Episode, Sequence, and Shot.")
+    def _record_fields(self):
+        """Flow record metadata — only gathered when a record is requested."""
         return {
-            "entity_type": "Shot",
-            "entity": shot,
-            "episode": ep["code"],
-            "sequence": seq["code"],
-            "step": "temp",
+            "submitted_for": self.cmb_submitted.currentText().strip(),
+            "description": self.txt_description.text().strip(),
+            "task_id": None,
+            **self._submitted_by_fields(),
+        }
+
+    def _gather_reference_context(self):
+        if self.radio_shot.isChecked():
+            ep = self.cmb_episode.currentData()
+            seq = self.cmb_sequence.currentData()
+            shot = self.cmb_shot.currentData()
+            if not (ep and seq and shot):
+                raise ValueError("Select Episode, Sequence, and Shot.")
+            context = {
+                "entity_type": "Shot",
+                "entity": shot,
+                "episode": ep["code"],
+                "sequence": seq["code"],
+                "step": "temp",
+                "version": 1,
+                "project_id": PROJECT_ID,
+            }
+        else:
+            asset = self.cmb_asset.currentData()
+            if not asset:
+                raise ValueError("Select an Asset.")
+            context = {
+                "entity_type": "Asset",
+                "entity": asset,
+                "asset_type": self.cmb_asset_type.currentText(),
+                "step": "reference",
+                "version": 1,
+                "project_id": PROJECT_ID,
+            }
+        if self.chk_flow_record.isChecked():
+            context.update(self._record_fields())
+        return context
+
+    def _gather_ingest_context(self):
+        """Context for a Flow record on a 3D delivery (Asset only)."""
+        asset = self.cmb_asset.currentData()
+        if not asset:
+            raise ValueError(
+                "Select an Asset to create the Flow record, or untick "
+                "Create Flow record to copy the files only."
+            )
+        return {
+            "entity_type": "Asset",
+            "entity": asset,
+            "asset_type": self.cmb_asset_type.currentText(),
+            "step": "ingest",
             "version": 1,
             "project_id": PROJECT_ID,
+            **self._record_fields(),
         }
+
+    def _create_flow_record(self, context, paths) -> str:
+        """Create the Flow Version and return a summary for the dialog."""
+        record = staging.create_flow_record(self.sg, self.media, context, paths)
+        version = record["version"]
+        summary = "Flow record: %s (Version %s)" % (
+            version.get("code", ""),
+            version["id"],
+        )
+        if record.get("url"):
+            summary += "\n%s" % record["url"]
+        for warning in record.get("warnings", []):
+            summary += "\n• %s" % warning
+        self._log(summary)
+        return summary
+
+    def _record_or_warn(self, context, paths) -> str:
+        """Record creation never undoes a successful copy — report instead."""
+        try:
+            return self._create_flow_record(context, paths)
+        except Exception as exc:
+            self._log("ERROR creating Flow record: %s" % exc)
+            return "Files were copied, but the Flow record failed:\n%s" % exc
+
+    def _reset_media(self):
+        self.btn_send.setEnabled(False)
+        self.media = None
+        self.drop.setText(self.drop.IDLE)
+        self.media_info.setText("No media loaded.")
+        self._update_modes()
 
     def send_to_watcher(self):
         if not self.media or not self.tk:
             return
 
+        wants_record = self.chk_flow_record.isChecked()
+
         # 3D asset deliveries go straight to the ingest watch folder.
         if self.media.get("media_type") == "model_3d":
             try:
+                # Validate the record context before copying anything so a
+                # missing Asset can't leave files in ingest with no record.
+                context = self._gather_ingest_context() if wants_record else None
                 asset_type = self.cmb_asset_type.currentText()
+                names = [f.name for f in self.media["files"]]
                 dest = staging.stage_asset_ingest(
                     INGEST_FOLDER, asset_type, self.media
                 )
                 self._log("Copied 3D delivery to:\n%s" % dest)
-                QMessageBox.information(
-                    self,
-                    "Sent to 3D Ingest",
+                message = (
                     "Copied %d file(s) into:\n%s\n\n"
                     "The ingest watcher will convert + turntable them."
-                    % (len(self.media["files"]), dest),
+                    % (len(names), dest)
                 )
-                self.btn_send.setEnabled(False)
-                self.media = None
-                self.drop.setText(self.drop.IDLE)
-                self.media_info.setText("No media loaded.")
+                if context:
+                    message += "\n\n%s" % self._record_or_warn(
+                        context, [dest / n for n in names]
+                    )
+                QMessageBox.information(self, "Sent to 3D Ingest", message)
+                self._reset_media()
             except Exception as exc:
                 self._log("ERROR: %s" % exc)
                 QMessageBox.critical(self, "Ingest failed", str(exc))
@@ -697,24 +813,24 @@ class ReviewDropWindow(QMainWindow):
         if self._is_reference_mode():
             try:
                 context = self._gather_reference_context()
-                copied = staging.stage_shot_reference(
+                copied = staging.stage_reference(
                     self.tk,
                     self.media,
                     context,
                     self.txt_name_override.text(),
                 )
-                self._log("Copied reference image(s):\n%s" % copied[0].parent)
-                QMessageBox.information(
-                    self,
-                    "Reference copied",
-                    "Copied %d reference image(s) into the Shot reference folder.\n\n"
-                    "No Flow Version was created.\n\n%s"
-                    % (len(copied), copied[0].parent),
+                self._log("Copied reference media:\n%s" % copied[0].parent)
+                message = (
+                    "Copied %d file(s) into the %s reference folder.\n\n%s"
+                    % (len(copied), context["entity_type"], copied[0].parent)
                 )
-                self.btn_send.setEnabled(False)
-                self.media = None
-                self.drop.setText(self.drop.IDLE)
-                self.media_info.setText("No media loaded.")
+                message += "\n\n%s" % (
+                    self._record_or_warn(context, copied)
+                    if wants_record
+                    else "No Flow record was created."
+                )
+                QMessageBox.information(self, "Reference copied", message)
+                self._reset_media()
                 self.txt_name_override.clear()
             except Exception as exc:
                 self._log("ERROR: %s" % exc)

@@ -29,6 +29,14 @@ MODEL_3D_EXTS = {
     ".obj", ".fbx", ".glb", ".gltf", ".ply", ".stl", ".abc",
     ".usd", ".usdc", ".usda", ".usdz", ".max", ".blend",
 }
+# Media that can be filed straight into a reference folder (no bake).
+REFERENCE_MEDIA_TYPES = {
+    "exr_single", "exr_sequence", "image_single", "image_sequence", "movie",
+}
+# Formats Flow can transcode into a viewable / thumbnail on upload.
+UPLOADABLE_EXTS = MOVIE_EXTS | {
+    ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".webp", ".bmp",
+}
 
 SEQUENCE_RE = re.compile(
     r"^(?P<head>.*?)(?P<frame>\d{3,8})(?P<tail>\.[^.]+)$",
@@ -318,41 +326,55 @@ def stage_and_flag(
     return flag_path
 
 
-def stage_shot_reference(
+def reference_root(tk: Any, context: dict) -> Path:
+    """Resolve the reference folder for the Shot or Asset in context."""
+    if context.get("entity_type") == "Shot":
+        fields = {
+            "Episode": context["episode"],
+            "Sequence": context["sequence"],
+            "Shot": context["entity"]["code"],
+            "Step": context.get("step") or "temp",
+            "version": int(context.get("version") or 1),
+        }
+        try:
+            tk.create_filesystem_structure("Shot", context["entity"]["id"])
+        except Exception:
+            pass
+        sample_mov = tk.templates["ep_nuke_shot_render_movie"].apply_fields(fields)
+        return Path(sample_mov).parent.parent / "reference"
+
+    fields = {
+        "Asset": context["entity"]["code"],
+        "sg_asset_type": context["asset_type"],
+        "version": int(context.get("version") or 1),
+    }
+    try:
+        tk.create_filesystem_structure("Asset", context["entity"]["id"])
+    except Exception:
+        pass
+    return Path(tk.templates["asset_root"].apply_fields(fields)) / "reference"
+
+
+def stage_reference(
     tk: Any,
     media: dict,
     context: dict,
     name_override: str = "",
 ) -> list[Path]:
     """
-    Copy still images into the selected shot's shared reference folder.
+    Copy stills or a QT into the selected Shot's / Asset's reference folder.
 
-    References do not create a render-complete flag or a Flow Version. The
+    References never write a render-complete flag, so nothing is baked. A Flow
+    record is only created when the caller also runs create_flow_record(). The
     optional override replaces the source basename while preserving extension
     and sequence frame numbers. Originals are also archived unchanged.
     """
-    if context.get("entity_type") != "Shot":
-        raise ValueError("Reference images must be associated with a Shot.")
-    if media.get("media_type") not in {
-        "exr_single", "exr_sequence", "image_single", "image_sequence",
-    }:
-        raise ValueError("Reference mode accepts still images only.")
+    if context.get("entity_type") not in {"Shot", "Asset"}:
+        raise ValueError("Reference media must be associated with a Shot or Asset.")
+    if media.get("media_type") not in REFERENCE_MEDIA_TYPES:
+        raise ValueError("Reference mode accepts still images and QT movies only.")
 
-    fields = {
-        "Episode": context["episode"],
-        "Sequence": context["sequence"],
-        "Shot": context["entity"]["code"],
-        "Step": context.get("step") or "temp",
-        "version": int(context.get("version") or 1),
-    }
-    try:
-        tk.create_filesystem_structure("Shot", context["entity"]["id"])
-    except Exception:
-        pass
-
-    sample_mov = tk.templates["ep_nuke_shot_render_movie"].apply_fields(fields)
-    shot_root = Path(sample_mov).parent.parent
-    reference_dir = shot_root / "reference"
+    reference_dir = reference_root(tk, context)
     source_dir = reference_dir / "source"
     reference_dir.mkdir(parents=True, exist_ok=True)
     _archive_originals(media, source_dir)
@@ -392,6 +414,222 @@ def stage_asset_ingest(
     for src in media["files"]:
         shutil.copy2(src, dest_dir / src.name)
     return dest_dir
+
+
+def create_flow_record(
+    sg: Any,
+    media: dict,
+    context: dict,
+    paths: list,
+) -> dict:
+    """
+    Create a Flow Production Tracking Version for media that skips the bake:
+    reference stills, reference QTs, and 3D asset deliveries.
+
+    `paths` are the files as they now live on the server (the copies made by
+    stage_reference / stage_asset_ingest), so the record points at pipeline
+    paths rather than at whatever the artist dragged in.
+
+    Returns {"version": <Flow entity>, "url": str, "warnings": [str, ...]}.
+    """
+    if sg is None:
+        raise ValueError("No Flow connection available.")
+    entity = context.get("entity")
+    entity_type = context.get("entity_type") or "Shot"
+    if not entity:
+        raise ValueError(
+            "Select a %s to attach the Flow record to." % entity_type.lower()
+        )
+    files = [Path(p) for p in paths]
+    if not files:
+        raise ValueError("Nothing was copied, so there is nothing to record.")
+
+    warnings: list[str] = []
+    media_type = media.get("media_type")
+    primary = files[0]
+
+    data = {
+        "project": {"type": "Project", "id": context["project_id"]},
+        "code": _unique_version_code(sg, context, _record_code(context, files)),
+        "entity": {"type": entity_type, "id": entity["id"]},
+        "description": context.get("description")
+        or "Delivered via Review Drop (%s)." % _record_kind(media_type),
+    }
+    statuses = _valid_list_values(sg, "Version", "sg_status_list")
+    if statuses is None or "rev" in statuses:
+        data["sg_status_list"] = "rev"
+    if media_type == "movie":
+        data["sg_path_to_movie"] = str(primary)
+    elif media_type == "model_3d":
+        data["sg_path_to_geometry"] = str(primary.parent)
+    else:
+        data["sg_path_to_frames"] = _frames_path(media, files)
+        if len(files) > 1:
+            data["sg_first_frame"] = int(media.get("frame_first") or 1)
+            data["sg_last_frame"] = int(media.get("frame_last") or len(files))
+            data["frame_count"] = len(files)
+
+    submitted_for = context.get("submitted_for")
+    if submitted_for:
+        valid = _valid_list_values(sg, "Version", "sg_submitted_for")
+        if valid is None or submitted_for in valid:
+            data["sg_submitted_for"] = submitted_for
+        else:
+            warnings.append(
+                "'%s' is not a configured Submitted for option — left unset."
+                % submitted_for
+            )
+    if context.get("user_id"):
+        data["user"] = {"type": "HumanUser", "id": int(context["user_id"])}
+    if context.get("task_id"):
+        data["sg_task"] = {"type": "Task", "id": context["task_id"]}
+
+    data = {k: v for k, v in data.items() if v not in (None, "")}
+    data, dropped = _drop_unsupported_fields(sg, "Version", data)
+    if dropped:
+        warnings.append(
+            "Flow has no Version field(s) %s on this site — skipped."
+            % ", ".join(sorted(dropped))
+        )
+
+    version = sg.create("Version", data)
+
+    # 3D geometry has no Flow viewable, and a texture sitting next to it is
+    # not a stand-in for one, so those records stay path-only.
+    upload = None if media_type == "model_3d" else _uploadable_source(files)
+    if upload is None:
+        warnings.append(
+            "%s can't be transcoded by Flow — the record links to the file "
+            "path only." % (
+                "3D geometry"
+                if media_type == "model_3d"
+                else primary.suffix.upper().lstrip(".")
+            )
+        )
+    else:
+        if len(files) > 1:
+            warnings.append(
+                "Sequence uploaded as its first frame; the record links to "
+                "the full range."
+            )
+        try:
+            sg.upload_thumbnail("Version", version["id"], str(upload))
+        except Exception as exc:
+            warnings.append("Thumbnail upload failed: %s" % exc)
+        try:
+            sg.upload(
+                "Version",
+                version["id"],
+                str(upload),
+                field_name="sg_uploaded_movie",
+            )
+        except Exception as exc:
+            warnings.append("Media upload failed: %s" % exc)
+
+    return {
+        "version": version,
+        "url": _entity_url(sg, "Version", version["id"]),
+        "warnings": warnings,
+    }
+
+
+def _record_kind(media_type: Optional[str]) -> str:
+    if media_type == "movie":
+        return "QT"
+    if media_type == "model_3d":
+        return "3D asset"
+    return "image"
+
+
+def _record_code(context: dict, files: list[Path]) -> str:
+    """Build a Version code from the entity plus the delivered filename."""
+    first = files[0]
+    match = SEQUENCE_RE.match(first.name)
+    stem = match.group("head") if match else first.stem
+    stem = re.sub(r"[^A-Za-z0-9]+", "_", stem).strip("_")
+    entity_code = (context.get("entity") or {}).get("code") or ""
+    if not stem:
+        stem = "reference"
+    if entity_code and not stem.lower().startswith(entity_code.lower()):
+        return "%s_%s" % (entity_code, stem)
+    return stem
+
+
+def _unique_version_code(sg: Any, context: dict, base: str) -> str:
+    """Append _v### until the code is free on this project."""
+    try:
+        existing = sg.find(
+            "Version",
+            [
+                ["project", "is", {"type": "Project", "id": context["project_id"]}],
+                ["code", "starts_with", base],
+            ],
+            ["code"],
+        )
+    except Exception:
+        return base
+    taken = {v.get("code") for v in existing}
+    if base not in taken:
+        return base
+    number = 2
+    while "%s_v%03d" % (base, number) in taken:
+        number += 1
+    return "%s_v%03d" % (base, number)
+
+
+def _frames_path(media: dict, files: list[Path]) -> str:
+    """Frame pattern for the copied stills, or the single file's path."""
+    if len(files) == 1:
+        return str(files[0])
+    match = SEQUENCE_RE.match(files[0].name)
+    if not match:
+        return str(files[0])
+    token = "%0{}d".format(len(match.group("frame")))
+    return str(files[0].parent / (match.group("head") + token + match.group("tail")))
+
+
+def _uploadable_source(files: list[Path]) -> Optional[Path]:
+    """First delivered file Flow can transcode, for thumbnail + viewable."""
+    for f in files:
+        if f.suffix.lower() in UPLOADABLE_EXTS:
+            return f
+    return None
+
+
+def _valid_list_values(sg: Any, entity_type: str, field: str) -> Optional[set]:
+    try:
+        schema = sg.schema_field_read(entity_type, field)
+        props = schema.get(field, {}).get("properties", {})
+        valid = props.get("valid_values", {}).get("value")
+        if valid:
+            return set(valid)
+    except Exception:
+        pass
+    return None
+
+
+def _drop_unsupported_fields(
+    sg: Any,
+    entity_type: str,
+    data: dict,
+) -> tuple[dict, set]:
+    """Strip fields this Flow site doesn't have so create() can't fail on them."""
+    try:
+        schema = sg.schema_field_read(entity_type)
+    except Exception:
+        return data, set()
+    if not schema:
+        return data, set()
+    supported = set(schema)
+    dropped = {k for k in data if k not in supported}
+    return {k: v for k, v in data.items() if k in supported}, dropped
+
+
+def _entity_url(sg: Any, entity_type: str, entity_id: int) -> str:
+    base = (getattr(sg, "base_url", "") or "").rstrip("/")
+    if not base:
+        return ""
+    return "%s/detail/%s/%d" % (base, entity_type, entity_id)
 
 
 def _archive_originals(media: dict, dest_dir: Path) -> None:

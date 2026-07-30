@@ -1280,6 +1280,23 @@ class PreviewWindow(QDialog):
         self.cmb_channel.setCurrentIndex(0)
         self.btn_fit.setChecked(True)
 
+    def reset_adjustments(self):
+        """Defaults after a successful Send — view controls + color-pipe chips."""
+        self.set_pipe_options({
+            "log_convert": True,
+            "cdl": True,
+            "show_lut": True,
+        })
+        self._reset_view()
+        if isinstance(self._source, StillSource) and self._source.linear:
+            self._source.pipe = self._pipe
+            self._cache.clear()
+            self._frame = None
+            if self._source.count():
+                self._show_frame(self.sld_frame.value())
+        elif self._frame is not None:
+            self._redraw()
+
     def _on_fit_toggled(self, checked: bool):
         self.canvas.set_fit(checked)
 

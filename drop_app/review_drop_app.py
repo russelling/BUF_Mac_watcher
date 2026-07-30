@@ -78,6 +78,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QCheckBox,
+    QSizePolicy,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -277,10 +278,11 @@ class ReviewDropWindow(QMainWindow):
         self.media_info.setStyleSheet(theme.MEDIA_INFO_CSS)
         layout.addWidget(self.media_info)
 
-        # Entity type — tab strip (Shot | Asset)
+        # Entity type — compact tab strip (only as wide as Shot | Asset)
         tab_host = QWidget()
         tab_host.setObjectName("EntityTabRow")
         tab_host.setStyleSheet(theme.ENTITY_TAB_ROW_CSS)
+        tab_host.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         type_row = QHBoxLayout(tab_host)
         type_row.setContentsMargins(0, 0, 0, 0)
         type_row.setSpacing(0)
@@ -292,6 +294,7 @@ class ReviewDropWindow(QMainWindow):
             tab.setCheckable(True)
             tab.setStyleSheet(theme.ENTITY_TAB_CSS)
             tab.setCursor(Qt.PointingHandCursor)
+            tab.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         self.radio_shot.setChecked(True)
         self.type_group = QButtonGroup(self)
         self.type_group.setExclusive(True)
@@ -299,8 +302,11 @@ class ReviewDropWindow(QMainWindow):
         self.type_group.addButton(self.radio_asset)
         type_row.addWidget(self.radio_shot)
         type_row.addWidget(self.radio_asset)
-        type_row.addStretch()
-        layout.addWidget(tab_host)
+        tab_bar = QHBoxLayout()
+        tab_bar.setContentsMargins(0, 0, 0, 0)
+        tab_bar.addWidget(tab_host)
+        tab_bar.addStretch(1)
+        layout.addLayout(tab_bar)
         self.radio_shot.toggled.connect(self._on_type_changed)
 
         # ── Two-column body: context (left) + delivery fields (right) ──────────
@@ -472,7 +478,7 @@ class ReviewDropWindow(QMainWindow):
         brand = QLabel("BUFFALO VFX")
         brand.setFont(load_brand_font(24))
         brand.setStyleSheet(theme.BRAND_CSS)
-        subtitle = QLabel("REVIEW DROP")
+        subtitle = QLabel("OBJECTS SUBMITTABLE")
         subtitle.setStyleSheet(theme.SUBTITLE_CSS)
         text_col.addWidget(brand)
         text_col.addWidget(subtitle)
@@ -1135,9 +1141,20 @@ class ReviewDropWindow(QMainWindow):
         self.media = None
         self.drop.setText(self.drop.IDLE)
         self.media_info.setText("No media loaded.")
+        self._reset_picture_adjustments()
         if self._preview_window is not None:
             self._preview_window.close()
         self._update_modes()
+
+    def _reset_picture_adjustments(self):
+        """Return exposure / gamma / channel / color-pipe chips to defaults."""
+        self._color_pipe = {
+            "log_convert": True,
+            "cdl": True,
+            "show_lut": True,
+        }
+        if self._preview_window is not None:
+            self._preview_window.reset_adjustments()
 
     def _shot_cdl_path(self):
         """CDL the bake would apply to the current shot, so the preview matches."""
@@ -1280,6 +1297,7 @@ class ReviewDropWindow(QMainWindow):
             except ValueError:
                 used = 1
             self._autofill_version(minimum=used + 1)
+            self._reset_picture_adjustments()
         except Exception as exc:
             self._log("ERROR: %s" % exc)
             QMessageBox.critical(self, "Send failed", str(exc))

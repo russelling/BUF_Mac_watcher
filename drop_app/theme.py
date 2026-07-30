@@ -318,17 +318,16 @@ QPushButton:disabled {{
 }}
 """
 
-# Shot / Asset entity switch — tab strip, one selected.
+# Shot / Asset entity switch — compact tab strip, width = labels only.
 ENTITY_TAB_CSS = f"""
 QPushButton {{
     background: transparent;
     color: {STRUCTURE};
     border: none;
     border-radius: 0px;
-    padding: 8px 22px;
+    padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
-    min-width: 88px;
 }}
 QPushButton:hover {{
     background: {SURFACE_RAISED};

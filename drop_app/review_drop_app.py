@@ -116,23 +116,42 @@ NO_EPISODE = "  (no episode)"
 NO_SEQUENCE = "  (no sequence)"
 
 
-def _searchable_combo() -> QComboBox:
+class SearchableComboBox(QComboBox):
     """
-    Editable combo with contains-matching autocomplete.
+    Editable combo: arrow shows every item, typing filters by contains-match.
 
-    Editable because a code the cascade filtered out — or one Flow hasn't got
-    yet — still has to be enterable. What gets typed is resolved against Flow
-    on submit rather than trusted on its own.
+    Qt's editable combo applies the completer filter to the arrow popup too.
+    With current text "— select —" (or any code MatchContains doesn't hit),
+    that filter empties the list — so the dropdown looks bare until the
+    artist starts typing. Detach the completer for the arrow popup; keep it
+    for keyboard entry.
     """
-    combo = QComboBox()
-    combo.setEditable(True)
-    combo.setInsertPolicy(QComboBox.NoInsert)
-    completer = combo.completer()
-    if completer:
-        completer.setCompletionMode(QCompleter.PopupCompletion)
-        completer.setCaseSensitivity(Qt.CaseInsensitive)
-        completer.setFilterMode(Qt.MatchContains)
-    return combo
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.setMaxVisibleItems(24)
+        self._completer = QCompleter(self)
+        self._completer.setModel(self.model())
+        self._completer.setCompletionMode(QCompleter.PopupCompletion)
+        self._completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._completer.setFilterMode(Qt.MatchContains)
+        self.setCompleter(self._completer)
+
+    def showPopup(self):
+        self._completer.setModel(self.model())
+        self.setCompleter(None)
+        super().showPopup()
+
+    def hidePopup(self):
+        super().hidePopup()
+        self._completer.setModel(self.model())
+        self.setCompleter(self._completer)
+
+
+def _searchable_combo() -> QComboBox:
+    return SearchableComboBox()
 
 
 def entity_code(text: str) -> str:

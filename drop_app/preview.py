@@ -161,15 +161,32 @@ def _first_error_line(output: str, tool: str) -> str:
 # ---------------------------------------------------------------------------
 
 class DecodedFrame:
-    def __init__(self, image: QImage, pipeline: str, tool: str, source: Path):
-        self.image = image
+    def __init__(
+        self,
+        image: QImage,
+        pipeline: str,
+        tool: str,
+        source: Path,
+        display_path: Optional[Path] = None,
+    ):
+        # Copy so the worker thread's buffer can't disappear under the GUI.
+        self.image = image.copy() if not image.isNull() else image
         self.pipeline = pipeline
         self.tool = tool
         self.source = source
+        # Prefer reloading this PNG on the GUI thread — most reliable on macOS.
+        self.display_path = Path(display_path) if display_path else None
 
     @property
     def matches_delivery(self) -> bool:
         return "approx" not in self.pipeline.lower()
+
+    def pixmap(self) -> QPixmap:
+        if self.display_path and self.display_path.is_file():
+            pix = QPixmap(str(self.display_path))
+            if not pix.isNull():
+                return pix
+        return QPixmap.fromImage(self.image)
 
 
 class FrameSource:
@@ -227,7 +244,9 @@ class StillSource(FrameSource):
         if not self.linear and ext in QT_READABLE_EXTS:
             image = QImage(str(src))
             if not image.isNull():
-                return DecodedFrame(image, "as delivered (display-referred)", "Qt", src)
+                return DecodedFrame(
+                    image, "as delivered (display-referred)", "Qt", src, src
+                )
 
         # Include pipe state in the temp name so toggling stages can't
         # accidentally reuse a previous bake sitting on disk.
@@ -241,7 +260,7 @@ class StillSource(FrameSource):
         image = QImage(str(dst))
         if image.isNull():
             raise RuntimeError("decoded frame could not be read back")
-        return DecodedFrame(image, pipeline, tool, src)
+        return DecodedFrame(image, pipeline, tool, src, dst)
 
     def unavailable_reason(self):
         ext = self.files[0].suffix.lower()
@@ -338,7 +357,7 @@ class MovieSource(FrameSource):
         if image.isNull():
             raise RuntimeError("ffmpeg produced no frame at %.2fs" % seconds)
         return DecodedFrame(
-            image, "as delivered (no color pipe)", "ffmpeg", self.movie_path
+            image, "as delivered (no color pipe)", "ffmpeg", self.movie_path, dst
         )
 
     def unavailable_reason(self):
@@ -617,27 +636,35 @@ def _isolate_channel(image: QImage, channel: str) -> QImage:
 
 class ImageCanvas(QWidget):
     """
-    Shows the current frame, fit to the window or at a fixed zoom.
+    Frame viewer painted with QPainter — never a styled QLabel.
 
-    Painted manually — a QLabel with a stylesheet background swallows its
-    pixmap on several Qt/macOS builds, which is why the preview came up black.
+    PreviewWindow applies APP_CSS, which styles every QLabel. On several
+    Qt/macOS builds that replaces QLabel pixmap painting and leaves a black
+    rectangle. Drawing here keeps the pixels independent of that stylesheet.
     """
 
     probed = Signal(int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("PreviewCanvas")
         self.setMouseTracking(True)
         self.setMinimumSize(320, 240)
-        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self._pixmap = None
-        self._display = None
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Background via palette only — no stylesheet on this widget either.
+        self.setAutoFillBackground(True)
+        pal = self.palette()
+        pal.setColor(self.backgroundRole(), QColor(theme.MIDNIGHT))
+        self.setPalette(pal)
+
+        self._pixmap = None  # type: Optional[QPixmap]
+        self._display = None  # type: Optional[QPixmap]
         self._fit = True
         self._zoom = 1.0
         self._drawn_rect = (0, 0, 1, 1)
 
     def set_frame(self, pixmap: Optional[QPixmap]):
-        self._pixmap = pixmap
+        self._pixmap = pixmap if pixmap is not None and not pixmap.isNull() else None
         self._rescale()
 
     def set_fit(self, fit: bool):
@@ -670,9 +697,7 @@ class ImageCanvas(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        # Layout often settles only after the first show — rescale then.
-        if self._fit:
-            self._rescale()
+        self._rescale()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -682,13 +707,20 @@ class ImageCanvas(QWidget):
         x0, y0, w, h = self._drawn_rect
         painter.drawPixmap(x0, y0, self._display)
 
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        self.probed.emit(-1, -1)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        self._on_mouse(event.position().toPoint())
+
     def _rescale(self):
         if self._pixmap is None or self._pixmap.isNull():
             self._display = None
             self.update()
             return
         if self._fit:
-            self.setMinimumSize(320, 240)
             target = self.size()
             if target.width() < 2 or target.height() < 2:
                 self._display = None
@@ -708,27 +740,25 @@ class ImageCanvas(QWidget):
         offset_x = max(0, (self.width() - self._display.width()) // 2)
         offset_y = max(0, (self.height() - self._display.height()) // 2)
         self._drawn_rect = (
-            offset_x, offset_y,
-            max(1, self._display.width()), max(1, self._display.height()),
+            offset_x,
+            offset_y,
+            max(1, self._display.width()),
+            max(1, self._display.height()),
         )
         self.update()
 
-    def mouseMoveEvent(self, event):
-        super().mouseMoveEvent(event)
-        if self._pixmap is None:
+    def _on_mouse(self, pos):
+        if self._pixmap is None or self._display is None or self._display.isNull():
             return
         x0, y0, w, h = self._drawn_rect
-        pos = event.position().toPoint()
-        if not (x0 <= pos.x() < x0 + w and y0 <= pos.y() < y0 + h):
+        x = pos.x() - x0
+        y = pos.y() - y0
+        if not (0 <= x < w and 0 <= y < h):
             self.probed.emit(-1, -1)
             return
-        source_x = int((pos.x() - x0) / w * self._pixmap.width())
-        source_y = int((pos.y() - y0) / h * self._pixmap.height())
+        source_x = int(x / w * self._pixmap.width())
+        source_y = int(y / h * self._pixmap.height())
         self.probed.emit(source_x, source_y)
-
-    def leaveEvent(self, event):
-        super().leaveEvent(event)
-        self.probed.emit(-1, -1)
 
 
 # ---------------------------------------------------------------------------
@@ -1063,8 +1093,20 @@ class PreviewWindow(QDialog):
         if self._frame is None:
             return
 
-        image = self._frame.image
         channel = self.cmb_channel.currentText()
+        exposure, gamma = self._exposure(), self._gamma()
+        identity = (
+            channel == "RGB"
+            and abs(exposure) < 1e-6
+            and abs(gamma - 1.0) < 1e-6
+            and not self._frame.image.hasAlphaChannel()
+        )
+        # Prefer reloading the PNG on the GUI thread (macOS-safe).
+        if identity:
+            self.canvas.set_frame(self._frame.pixmap())
+            return
+
+        image = self._frame.image
         if channel != "RGB":
             image = _isolate_channel(image, channel)
         elif image.hasAlphaChannel():

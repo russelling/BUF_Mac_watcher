@@ -910,6 +910,10 @@ def bake_sequence(data, output_paths):
             )
 
         # ── 3. Build frame list for FFmpeg concat ─────────────────────────────
+        # The trailing duplicate of the last file is required so the previous
+        # duration= line actually applies — but ffmpeg also encodes that
+        # duplicate as a real frame. Cap with -frames:v so a single EXR stays
+        # one image frame (plus optional slate), not two.
         concat_list = os.path.join(tmpdir, "frames.txt")
         with open(concat_list, "w") as f:
             if slate_path:
@@ -920,6 +924,8 @@ def bake_sequence(data, output_paths):
                 f.write("duration %f\n" % (1.0 / FPS))
             if baked_frames:
                 f.write("file '%s'\n" % baked_frames[-1])
+
+        expected_frames = len(baked_frames) + (1 if slate_path else 0)
 
         if include_slate:
             # Slate at output index 0; first image frame at index 1.
@@ -948,6 +954,7 @@ def bake_sequence(data, output_paths):
                 "-safe", "0",
                 "-i", concat_list,
                 "-vf", burnin_filters,
+                "-frames:v", str(expected_frames),
                 "-c:v", "prores_ks",
                 "-profile:v", "3",        # ProRes 422 HQ
                 "-vendor", "apl0",

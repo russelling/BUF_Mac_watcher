@@ -156,6 +156,11 @@ QScrollArea {{
     border: 1px solid {STRUCTURE_LINE};
     border-radius: {RADIUS_TIGHT};
 }}
+/* Preview pixels are painted by ImageCanvas — never style that widget. */
+#PreviewCanvas {{
+    background: {MIDNIGHT};
+    border: none;
+}}
 QToolTip {{
     background: {NAVY};
     color: {WHITE};

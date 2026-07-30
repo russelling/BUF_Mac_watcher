@@ -16,9 +16,10 @@ Bottom row order is Preview → Send → Open 3D Ingest.
 
 1. **Drag & drop** or **click** the drop zone to browse for an image
    sequence, single still, EXR, MOV/MP4, or 3D file
-2. Pick **Shot** (Episode → Sequence → Shot) or **Asset** from Flow
+2. Pick **Shot** (Episode → Sequence → Shot) or **Asset** hierarchy from Flow
 3. Set Step / Submitted by / Submitted for / Notes — **Version** autofills
-   to the next free `{Shot|Asset}_{Step}_v###` in Flow
+   to the next free Shot `{Shot}_{Step}_v###` or Asset
+   `{script}_{real}_{variant}_{step}_v###` in Flow
 4. Optional **Include slate** (especially useful for single frames)
 5. Copies media into the pipeline render area and writes a
    `.render_complete_*.json` flag
@@ -121,14 +122,52 @@ under the selected Shot at:
 
 `source/review_drop/{Shot}_{Step}_v###/`
 
+### Asset location schema
+
+Asset review media, turntables, references, and 3D ingest all use the same
+hierarchy:
+
+```
+{type}/{script_name}/{real_name}/{variant}
+```
+
+| Segment | Meaning | Examples |
+|---------|---------|----------|
+| `type` | Short asset class | `chr` · `prp` · `env` · `veh` |
+| `script_name` | Flow Asset.code / script name | `set_mdr` · `veh_marks_volvo` |
+| `real_name` | Real-world location or asset | `wf_stage_02` · `sedan_960` |
+| `variant` | Look / state under that real name | `base` · `previz` · `pre_crash` · `post_crash` · `pod` |
+
+Pipeline paths resolve under Toolkit as:
+
+```
+…/assets/{sg_asset_type}/{Asset}/{real_name}/{variant}/…
+```
+
+e.g. `…/assets/env/set_mdr/wf_stage_02/base/`. Flow still stores the Asset as
+`script_name` (`Asset.code`); `sg_asset_type` should be the short code
+(`env`, `veh`, …). Legacy labels (`Environment`, `Vehicle`, …) still match
+when filtering in the drop app.
+
+Version / publish stems follow:
+
+`{script_name}_{real_name}_{variant}[_{step}]_v###`
+
+Update the ShotGrid Toolkit templates on the volume (`asset_root`,
+`unreal_asset_turntable_render`, `unreal_asset_turntable_movie`, and any
+related paths) to include `{real_name}` and `{variant}` under `{Asset}`.
+
 ### 3D asset deliveries (OBJ / FBX / GLB / PLY / USD / ABC …)
 
 Drop a 3D file directly on the window. The app switches to **Asset** mode;
-pick the **Asset Type** and click **Send to 3D Ingest** — the file is copied
-into the ingest watch folder under that type, where the ingest watcher
-converts and turntables it. Tick **Create Flow record** to also log the
-delivery against a Flow Asset. (The **Open 3D Ingest Folder** button still
-opens the drop folder in Finder for manual/bulk deliveries.)
+fill **Type / Script name / Real name / Variant** and click **Send to 3D
+Ingest** — the file is copied into:
+
+`_staging/assets_incoming/{type}/{script_name}/{real_name}/{variant}/`
+
+Tick **Create Flow record** to also log the delivery against the Flow Asset
+(script name). (The **Open 3D Ingest Folder** button still opens the drop
+folder in Finder for manual/bulk deliveries.)
 
 Recognized 3D formats: `obj, fbx, glb, gltf, ply, stl, abc, usd, usdc, usda,
 usdz, max, blend`.
@@ -147,7 +186,8 @@ usdz, max, blend`.
 
 `/Volumes/.../buffalo_vfx/_staging/assets_incoming/`
 
-Drop into `Character` / `Prop` / `Environment` / `Vehicle` / `FX` as before.
+Drop under `{type}/{script_name}/{real_name}/{variant}/`
+(e.g. `env/set_mdr/wf_stage_02/base/`).
 
 ## Requirements
 

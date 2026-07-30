@@ -18,8 +18,8 @@ Builds:
           Frame Range, Start TC, Submitted For, Description
 
       Asset context:
-          Show logo, Asset Type / Asset, Step, Version, Artist, Date,
-          Submitted For, Description
+          Show logo, type / script_name / real_name / variant, Step,
+          Version, Artist, Date, Submitted For, Description
 
   - Burn-ins on every frame:
 
@@ -31,9 +31,9 @@ Builds:
           bottom right : timecode
 
       Asset (turntable):
-          upper left   : "{asset_type} - {asset_name}"
+          upper left   : "{type} / {script} / {real} / {variant}"
           upper right  : date
-          lower left   : "{asset}_{step}_v{version}"
+          lower left   : "{script}_{real}_{variant}_{step}_v{version}"
           bottom center: frame counter (always white)
           bottom right : timecode
 
@@ -218,10 +218,21 @@ def build_burnins(parent, data, first_frame):
         cut_in     = data.get("cut_in")
         cut_out    = data.get("cut_out")
     else:
-        asset_name  = data.get("entity_name", "")
-        asset_type  = data.get("asset_type", "Asset")
-        upper_left  = "%s - %s" % (asset_type, asset_name)
-        lower_left  = "%s_%s_v%03d" % (asset_name, step, version)
+        script = data.get("script_name") or data.get("entity_name", "")
+        real = data.get("real_name") or ""
+        variant = data.get("variant") or ""
+        upper_left = " / ".join(
+            p for p in (
+                data.get("asset_type", "Asset"),
+                script,
+                real,
+                variant,
+            ) if p
+        )
+        stem_parts = [p for p in (script, real, variant) if p]
+        if step:
+            stem_parts.append(step)
+        lower_left = "%s_v%03d" % ("_".join(stem_parts), version)
         cut_in = cut_out = None
 
     last = parent
@@ -304,9 +315,13 @@ def build_slate(data, first_frame, last_frame):
             data.get("shot_code", ""),
         )
     else:
-        context_line = "%s / %s" % (
-            data.get("asset_type", "Asset"),
-            data.get("entity_name", ""),
+        context_line = " / ".join(
+            p for p in (
+                data.get("asset_type", "Asset"),
+                data.get("script_name") or data.get("entity_name", ""),
+                data.get("real_name") or "",
+                data.get("variant") or "",
+            ) if p
         )
 
     start_tc = data.get("start_timecode")

@@ -29,6 +29,31 @@ MODEL_3D_EXTS = {
     ".obj", ".fbx", ".glb", ".gltf", ".ply", ".stl", ".abc",
     ".usd", ".usdc", ".usda", ".usdz", ".max", ".blend",
 }
+
+# Asset location schema:
+#   {type}/{script_name}/{real_name}/{variant}
+#   e.g. assets/env/set_mdr/wf_stage_02/base
+ASSET_TYPE_CODES = ("chr", "prp", "env", "veh")
+ASSET_TYPE_LABELS = {
+    "chr": "Character",
+    "prp": "Prop",
+    "env": "Environment",
+    "veh": "Vehicle",
+}
+# Accept legacy ShotGrid values and short codes when filtering.
+ASSET_TYPE_ALIASES = {
+    "chr": {"chr", "character"},
+    "prp": {"prp", "prop"},
+    "env": {"env", "environment"},
+    "veh": {"veh", "vehicle"},
+}
+ASSET_VARIANT_DEFAULTS = (
+    "base",
+    "previz",
+    "pre_crash",
+    "post_crash",
+    "pod",
+)
 # Media that can be filed straight into a reference folder (no bake).
 REFERENCE_MEDIA_TYPES = {
     "exr_single", "exr_sequence", "image_single", "image_sequence", "movie",
@@ -152,22 +177,143 @@ def next_version(existing_dir: Path, stem_prefix: str) -> int:
     return (max(versions) + 1) if versions else 1
 
 
-def version_name_prefixes(entity_code: str, step: str, entity_type: str) -> list:
+def normalize_asset_type(value: str) -> str:
+    """Return short type code (chr|prp|env|veh) or empty string."""
+    raw = (value or "").strip().lower()
+    if not raw:
+        return ""
+    for code, aliases in ASSET_TYPE_ALIASES.items():
+        if raw == code or raw in aliases:
+            return code
+    return ""
+
+
+def asset_type_matches(selected_code: str, asset_sg_type: str) -> bool:
+    """True if a Flow Asset's sg_asset_type matches the selected short code."""
+    selected = normalize_asset_type(selected_code)
+    actual = normalize_asset_type(asset_sg_type)
+    if not selected:
+        return True
+    if not actual:
+        return True  # untyped assets stay visible
+    return selected == actual
+
+
+def sanitize_path_token(value: str, label: str) -> str:
+    """Filesystem-safe token for type/script/real/variant path segments."""
+    token = re.sub(r"[^A-Za-z0-9_\-]+", "_", (value or "").strip()).strip("_")
+    if not token:
+        raise ValueError("Enter a %s." % label)
+    return token
+
+
+def asset_hierarchy(
+    asset_type: str,
+    script_name: str,
+    real_name: str,
+    variant: str,
+) -> dict:
     """
-    Version code stems the QT Watcher / Review Drop use before `_v###`.
+    Normalize the asset location schema:
+
+      {type}/{script_name}/{real_name}/{variant}
+    """
+    type_code = normalize_asset_type(asset_type)
+    if type_code not in ASSET_TYPE_CODES:
+        raise ValueError("Select an asset type (chr / prp / env / veh).")
+    return {
+        "asset_type": type_code,
+        "script_name": sanitize_path_token(script_name, "script name"),
+        "real_name": sanitize_path_token(real_name, "real-world name"),
+        "variant": sanitize_path_token(variant, "variant"),
+    }
+
+
+def asset_relpath(hierarchy: dict) -> Path:
+    """Relative path type/script_name/real_name/variant."""
+    return Path(
+        hierarchy["asset_type"],
+        hierarchy["script_name"],
+        hierarchy["real_name"],
+        hierarchy["variant"],
+    )
+
+
+def toolkit_asset_fields(context: dict, version: int | None = None) -> dict:
+    """Fields for Toolkit templates under the new asset schema."""
+    hierarchy = asset_hierarchy(
+        context.get("asset_type") or "",
+        context.get("script_name") or (context.get("entity") or {}).get("code") or "",
+        context.get("real_name") or "",
+        context.get("variant") or "base",
+    )
+    fields = {
+        "Asset": hierarchy["script_name"],
+        "sg_asset_type": hierarchy["asset_type"],
+        "script_name": hierarchy["script_name"],
+        "real_name": hierarchy["real_name"],
+        "variant": hierarchy["variant"],
+        "version": int(version if version is not None else context.get("version") or 1),
+    }
+    return fields
+
+
+def asset_publish_stem(hierarchy: dict, step: str = "") -> str:
+    """Stem used in Version codes and publish leaves before `_v###`."""
+    parts = [
+        hierarchy["script_name"],
+        hierarchy["real_name"],
+        hierarchy["variant"],
+    ]
+    step = (step or "").strip()
+    if step and step not in {"reference", "ingest"}:
+        parts.append(step)
+    return "_".join(parts)
+
+
+def version_name_prefixes(
+    entity_code: str,
+    step: str,
+    entity_type: str,
+    real_name: str = "",
+    variant: str = "",
+) -> list:
+    """
+    Version code stems before `_v###`.
 
     Shot:   {Shot}_{Step}_v001
-    Asset:  {Asset}_{Step}_turntable_v001  (watcher), plus {Asset}_{Step}_v001
+    Asset:  {script}_{real}_{variant}_{step}_v001
+            {script}_{real}_{variant}_turntable_v001
     """
     code = (entity_code or "").strip()
     step = (step or "").strip()
-    if not code or not step:
+    if not code:
         return []
     if entity_type == "Asset":
-        return [
-            "%s_%s_turntable" % (code, step),
-            "%s_%s" % (code, step),
-        ]
+        if not (real_name and variant):
+            return []
+        try:
+            hierarchy = {
+                "script_name": sanitize_path_token(code, "script name"),
+                "real_name": sanitize_path_token(real_name, "real-world name"),
+                "variant": sanitize_path_token(variant, "variant"),
+            }
+        except ValueError:
+            return []
+        base = asset_publish_stem(hierarchy, "")
+        prefixes = [base]
+        if step and step not in {"reference", "ingest"}:
+            with_step = asset_publish_stem(hierarchy, step)
+            if with_step not in prefixes:
+                prefixes.append(with_step)
+        # Alternate bake naming used when the step itself isn't "turntable".
+        if step != "turntable":
+            turntable = "%s_turntable" % base
+            if turntable not in prefixes:
+                prefixes.append(turntable)
+        return prefixes
+    if not step:
+        return []
     return ["%s_%s" % (code, step)]
 
 
@@ -177,14 +323,18 @@ def next_version_from_flow(
     entity_type: str,
     entity_code: str,
     step: str,
+    real_name: str = "",
+    variant: str = "",
 ) -> int:
     """
-    Next free version number for `{entity}_{step}_v###` on this project.
+    Next free version number for the watcher naming convention on this project.
 
-    Looks at Version.code values in Flow (ShotGrid) that match the watcher
-    naming convention, and returns max(existing) + 1 (or 1 if none).
+    Looks at Version.code values in Flow (ShotGrid) and returns
+    max(existing) + 1 (or 1 if none).
     """
-    prefixes = version_name_prefixes(entity_code, step, entity_type)
+    prefixes = version_name_prefixes(
+        entity_code, step, entity_type, real_name=real_name, variant=variant
+    )
     if not prefixes or sg is None:
         return 1
 
@@ -321,19 +471,22 @@ def stage_and_flag(
             "source": "review_drop_app",
         }
     else:
-        asset_code = context["entity"]["code"]
-        asset_type = context["asset_type"]
-        fields = {
-            "Asset": asset_code,
-            "sg_asset_type": asset_type,
-            "version": version,
-        }
+        hierarchy = asset_hierarchy(
+            context.get("asset_type") or "",
+            context.get("script_name")
+            or (context.get("entity") or {}).get("code")
+            or "",
+            context.get("real_name") or "",
+            context.get("variant") or "base",
+        )
+        fields = toolkit_asset_fields(context, version)
         try:
             tk.create_filesystem_structure("Asset", context["entity"]["id"])
         except Exception:
             pass
 
-        leaf = "%s_%s_v%03d" % (asset_code, step, version)
+        stem = asset_publish_stem(hierarchy, step)
+        leaf = "%s_v%03d" % (stem, version)
         # Turntable step uses the canonical turntable render folder so the
         # existing watcher/movie templates resolve correctly.
         if step == "turntable" and tk.templates.get("unreal_asset_turntable_render"):
@@ -370,8 +523,11 @@ def stage_and_flag(
             "project_id": project_id,
             "entity_type": "Asset",
             "entity_id": context["entity"]["id"],
-            "entity_name": asset_code,
-            "asset_type": asset_type,
+            "entity_name": hierarchy["script_name"],
+            "asset_type": hierarchy["asset_type"],
+            "script_name": hierarchy["script_name"],
+            "real_name": hierarchy["real_name"],
+            "variant": hierarchy["variant"],
             "step": step,
             "version": version,
             "artist": artist,
@@ -414,11 +570,7 @@ def reference_root(tk: Any, context: dict) -> Path:
         sample_mov = tk.templates["ep_nuke_shot_render_movie"].apply_fields(fields)
         return Path(sample_mov).parent.parent / "reference"
 
-    fields = {
-        "Asset": context["entity"]["code"],
-        "sg_asset_type": context["asset_type"],
-        "version": int(context.get("version") or 1),
-    }
+    fields = toolkit_asset_fields(context)
     try:
         tk.create_filesystem_structure("Asset", context["entity"]["id"])
     except Exception:
@@ -467,20 +619,25 @@ def stage_reference(
 
 def stage_asset_ingest(
     ingest_root: str,
-    asset_type: str,
     media: dict,
+    asset_type: str = "",
+    script_name: str = "",
+    real_name: str = "",
+    variant: str = "",
+    hierarchy: dict | None = None,
 ) -> Path:
     """
-    Copy dropped 3D asset files into the ingest watch folder under the
-    chosen asset-type subfolder (e.g. .../assets_incoming/Prop/).
+    Copy dropped 3D asset files into the ingest watch folder under:
 
-    The type folder name IS the sg_asset_type for the ingest watcher, so no
-    flag is written here — the ingest pipeline handles conversion/turntable.
+      {ingest_root}/{type}/{script_name}/{real_name}/{variant}/
+
+    No flag is written here — the ingest pipeline handles conversion/turntable.
     Returns the destination folder.
     """
-    if not asset_type:
-        raise ValueError("Select an Asset Type for a 3D delivery.")
-    dest_dir = Path(ingest_root) / asset_type
+    hierarchy = hierarchy or asset_hierarchy(
+        asset_type, script_name, real_name, variant or "base"
+    )
+    dest_dir = Path(ingest_root) / asset_relpath(hierarchy)
     dest_dir.mkdir(parents=True, exist_ok=True)
     for src in media["files"]:
         shutil.copy2(src, dest_dir / src.name)

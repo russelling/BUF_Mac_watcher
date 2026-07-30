@@ -338,14 +338,34 @@ class ReviewDropWindow(QMainWindow):
         asset_form.setContentsMargins(8, 8, 8, 8)
         asset_form.setSpacing(6)
         self.cmb_asset_type = QComboBox()
+        for code in staging.ASSET_TYPE_CODES:
+            self.cmb_asset_type.addItem(
+                "%s  ·  %s" % (code, staging.ASSET_TYPE_LABELS[code]),
+                code,
+            )
         self.cmb_asset = _searchable_combo()
-        self.cmb_asset_type.currentIndexChanged.connect(self._load_assets)
+        self.cmb_asset.setToolTip(
+            "Script / Flow Asset name, e.g. set_mdr or veh_marks_volvo"
+        )
+        self.txt_asset_real = QLineEdit()
+        self.txt_asset_real.setPlaceholderText("e.g. wf_stage_02 / sedan_960")
+        self.txt_asset_real.setToolTip("Real-world location or asset name")
+        self.cmb_asset_variant = QComboBox()
+        self.cmb_asset_variant.setEditable(True)
+        self.cmb_asset_variant.setInsertPolicy(QComboBox.NoInsert)
+        self.cmb_asset_variant.setToolTip(
+            "Variant under the real name, e.g. base, previz, pre_crash"
+        )
+        self._reload_variant_choices()
+        self.cmb_asset_type.currentIndexChanged.connect(self._on_asset_type_changed)
         self.cmb_asset.currentIndexChanged.connect(self._autofill_version)
         self.cmb_asset.lineEdit().editingFinished.connect(self._autofill_version)
-        for t in ["Character", "Prop", "Environment", "Vehicle", "FX"]:
-            self.cmb_asset_type.addItem(t)
+        self.txt_asset_real.textChanged.connect(self._autofill_version)
+        self.cmb_asset_variant.currentTextChanged.connect(self._autofill_version)
         asset_form.addRow("Type", self.cmb_asset_type)
-        asset_form.addRow("Asset", self.cmb_asset)
+        asset_form.addRow("Script name", self.cmb_asset)
+        asset_form.addRow("Real name", self.txt_asset_real)
+        asset_form.addRow("Variant", self.cmb_asset_variant)
         left_col.addWidget(self.asset_box)
         self.asset_box.hide()
         left_col.addStretch()
@@ -733,18 +753,58 @@ class ReviewDropWindow(QMainWindow):
         self.cmb_shot.blockSignals(False)
         self._autofill_version()
 
+    def _selected_asset_type(self) -> str:
+        """Short type code (chr|prp|env|veh) from the Type combo."""
+        data = self.cmb_asset_type.currentData()
+        if data:
+            return str(data)
+        return staging.normalize_asset_type(self.cmb_asset_type.currentText())
+
+    def _reload_variant_choices(self):
+        current = ""
+        if hasattr(self, "cmb_asset_variant"):
+            current = (self.cmb_asset_variant.currentText() or "").strip()
+        self.cmb_asset_variant.blockSignals(True)
+        self.cmb_asset_variant.clear()
+        for variant in staging.ASSET_VARIANT_DEFAULTS:
+            self.cmb_asset_variant.addItem(variant)
+        if current:
+            index = self.cmb_asset_variant.findText(current)
+            if index >= 0:
+                self.cmb_asset_variant.setCurrentIndex(index)
+            else:
+                self.cmb_asset_variant.setEditText(current)
+        else:
+            self.cmb_asset_variant.setCurrentIndex(0)
+        self.cmb_asset_variant.blockSignals(False)
+
+    def _on_asset_type_changed(self, *_args):
+        self._reload_variant_choices()
+        self._load_assets()
+
+    def _asset_hierarchy_from_ui(self) -> dict:
+        """Normalize type / script / real / variant from the Asset form."""
+        return staging.asset_hierarchy(
+            self._selected_asset_type(),
+            entity_code(self.cmb_asset.currentText()) or "",
+            self.txt_asset_real.text(),
+            self.cmb_asset_variant.currentText() or "base",
+        )
+
     def _load_assets(self, *_args):
         if not self.sg:
             return
         if not self._assets:
             self._assets = self._find_all("Asset", ["code", "sg_asset_type"])
             self._log("Loaded %d asset(s)." % len(self._assets))
-        asset_type = self.cmb_asset_type.currentText()
+        asset_type = self._selected_asset_type()
         self.cmb_asset.blockSignals(True)
         self.cmb_asset.clear()
         self.cmb_asset.addItem(PLACEHOLDER, None)
         for asset in self._assets:
-            if asset_type and asset.get("sg_asset_type") not in (None, asset_type):
+            if not staging.asset_type_matches(
+                asset_type, asset.get("sg_asset_type") or ""
+            ):
                 continue
             self.cmb_asset.addItem(asset["code"], asset)
         self.cmb_asset.blockSignals(False)
@@ -793,9 +853,22 @@ class ReviewDropWindow(QMainWindow):
         if not code or not step:
             return
         entity_type = "Shot" if self.radio_shot.isChecked() else "Asset"
+        real_name = ""
+        variant = ""
+        if entity_type == "Asset":
+            real_name = self.txt_asset_real.text().strip()
+            variant = self.cmb_asset_variant.currentText().strip()
+            if not real_name or not variant:
+                return
         try:
             number = staging.next_version_from_flow(
-                self.sg, PROJECT_ID, entity_type, code, step
+                self.sg,
+                PROJECT_ID,
+                entity_type,
+                code,
+                step,
+                real_name=real_name,
+                variant=variant,
             )
         except Exception as exc:
             self._log("Could not read next version from Flow: %s" % exc)
@@ -829,7 +902,8 @@ class ReviewDropWindow(QMainWindow):
             more = "" if len(self.media["files"]) <= 3 else " …"
             info = (
                 "3D asset delivery (%d file%s): %s%s\n"
-                "→ routes to the ingest watch folder by Asset Type."
+                "→ routes to ingest as "
+                "{type}/{script_name}/{real_name}/{variant}."
                 % (
                     len(self.media["files"]),
                     "" if len(self.media["files"]) == 1 else "s",
@@ -925,10 +999,14 @@ class ReviewDropWindow(QMainWindow):
                 "task_id": None,
                 **submitted_by,
             }
+        hierarchy = self._asset_hierarchy_from_ui()
         return {
             "entity_type": "Asset",
             "entity": self._asset_selection(),
-            "asset_type": self.cmb_asset_type.currentText(),
+            "asset_type": hierarchy["asset_type"],
+            "script_name": hierarchy["script_name"],
+            "real_name": hierarchy["real_name"],
+            "variant": hierarchy["variant"],
             "step": self.cmb_step.currentText().strip() or "turntable",
             "version": int(self.txt_version.text().strip() or "1"),
             "submitted_for": self.cmb_submitted.currentText().strip(),
@@ -1053,11 +1131,11 @@ class ReviewDropWindow(QMainWindow):
             "Asset",
             self._assets,
             ["code", "sg_asset_type"],
-            {"sg_asset_type": self.cmb_asset_type.currentText()},
+            {"sg_asset_type": self._selected_asset_type()},
             "Asset",
         )
         if not asset:
-            raise ValueError("Select or type an Asset.")
+            raise ValueError("Select or type a script name (Flow Asset).")
         return asset
 
     def _record_fields(self):
@@ -1082,10 +1160,14 @@ class ReviewDropWindow(QMainWindow):
                 "project_id": PROJECT_ID,
             }
         else:
+            hierarchy = self._asset_hierarchy_from_ui()
             context = {
                 "entity_type": "Asset",
                 "entity": self._asset_selection(),
-                "asset_type": self.cmb_asset_type.currentText(),
+                "asset_type": hierarchy["asset_type"],
+                "script_name": hierarchy["script_name"],
+                "real_name": hierarchy["real_name"],
+                "variant": hierarchy["variant"],
                 "step": "reference",
                 "version": 1,
                 "project_id": PROJECT_ID,
@@ -1096,16 +1178,20 @@ class ReviewDropWindow(QMainWindow):
 
     def _gather_ingest_context(self):
         """Context for a Flow record on a 3D delivery (Asset only)."""
+        hierarchy = self._asset_hierarchy_from_ui()
         asset = self.cmb_asset.currentData()
         if not asset:
             raise ValueError(
-                "Select an Asset to create the Flow record, or untick "
-                "Create Flow record to copy the files only."
+                "Select a script name (Flow Asset) to create the Flow "
+                "record, or untick Create Flow record to copy the files only."
             )
         return {
             "entity_type": "Asset",
             "entity": asset,
-            "asset_type": self.cmb_asset_type.currentText(),
+            "asset_type": hierarchy["asset_type"],
+            "script_name": hierarchy["script_name"],
+            "real_name": hierarchy["real_name"],
+            "variant": hierarchy["variant"],
             "step": "ingest",
             "version": 1,
             "project_id": PROJECT_ID,
@@ -1221,10 +1307,21 @@ class ReviewDropWindow(QMainWindow):
                 # Validate the record context before copying anything so a
                 # missing Asset can't leave files in ingest with no record.
                 context = self._gather_ingest_context() if wants_record else None
-                asset_type = self.cmb_asset_type.currentText()
+                hierarchy = (
+                    {
+                        "asset_type": context["asset_type"],
+                        "script_name": context["script_name"],
+                        "real_name": context["real_name"],
+                        "variant": context["variant"],
+                    }
+                    if context
+                    else self._asset_hierarchy_from_ui()
+                )
                 names = [f.name for f in self.media["files"]]
                 dest = staging.stage_asset_ingest(
-                    INGEST_FOLDER, asset_type, self.media
+                    INGEST_FOLDER,
+                    self.media,
+                    hierarchy=hierarchy,
                 )
                 self._log("Copied 3D delivery to:\n%s" % dest)
                 message = (
@@ -1316,8 +1413,10 @@ class ReviewDropWindow(QMainWindow):
         QMessageBox.information(
             self,
             "3D Asset Ingest",
-            "Drop 3D deliveries into a type folder:\n\n"
-            "  Character / Prop / Environment / Vehicle / FX\n\n"
+            "Drop 3D deliveries under:\n\n"
+            "  {type}/{script_name}/{real_name}/{variant}/\n\n"
+            "Types: chr · prp · env · veh\n"
+            "Example: env/set_mdr/wf_stage_02/base/\n\n"
             "The ingest watcher on the Mac Studio processes them automatically.",
         )
 

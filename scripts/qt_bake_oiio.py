@@ -16,14 +16,15 @@ Slate frame:
     - Context-aware text block:
         Shot:  Episode / Scene / Shot / Step / Version / Artist / Date /
                Frame Range / Start TC / Submitted For / Description
-        Asset: Asset Type / Asset / Step / Version / Artist / Date /
-               Submitted For / Description
+        Asset: type / script_name / real_name / variant / Step / Version /
+               Artist / Date / Submitted For / Description
 
 Burn-ins on every frame:
     Upper left:    "In House - {artist}"  (shots)
-                   "{asset_type} - {asset}"  (assets)
+                   "{type} / {script} / {real} / {variant}"  (assets)
     Upper right:   date
-    Lower left:    "{shot}_{step}_v{version}"  or  "{asset}_{step}_v{version}"
+    Lower left:    "{shot}_{step}_v{version}"  or
+                   "{script}_{real}_{variant}_{step}_v{version}"
     Bottom center: source frame number
     Bottom right:  source timecode (HH:MM:SS:FF), anchored to start_timecode
 
@@ -533,13 +534,23 @@ def build_drawtext_filters(data, frame_offset, start_tc):
             data.get("version", 1),
         )
     else:
-        upper_left = "%s - %s" % (
-            data.get("asset_type", "Asset"),
-            data.get("entity_name", ""),
+        script = data.get("script_name") or data.get("entity_name", "")
+        real = data.get("real_name") or ""
+        variant = data.get("variant") or ""
+        upper_left = " / ".join(
+            p for p in (
+                data.get("asset_type", "Asset"),
+                script,
+                real,
+                variant,
+            ) if p
         )
-        lower_left = "%s_%s_v%03d" % (
-            data.get("entity_name", ""),
-            data.get("step", ""),
+        stem_parts = [p for p in (script, real, variant) if p]
+        step = data.get("step", "")
+        if step:
+            stem_parts.append(step)
+        lower_left = "%s_v%03d" % (
+            "_".join(stem_parts),
             data.get("version", 1),
         )
 
@@ -625,9 +636,13 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
             data.get("shot_code", ""),
         )
     else:
-        context_line = "%s / %s" % (
-            data.get("asset_type", "Asset"),
-            data.get("entity_name", ""),
+        context_line = " / ".join(
+            p for p in (
+                data.get("asset_type", "Asset"),
+                data.get("script_name") or data.get("entity_name", ""),
+                data.get("real_name") or "",
+                data.get("variant") or "",
+            ) if p
         )
 
     lines = [

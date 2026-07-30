@@ -30,6 +30,37 @@ into the selected Shot's (or Asset's) `reference/` folder, skipping the bake.
 the source extension and sequence frame numbers. Unchanged originals are
 also retained under `reference/source/`.
 
+### Preview
+
+**Preview…** (or double-click the drop zone) opens a viewer on whatever is
+loaded, so visibility and color can be checked before anything is sent.
+
+Scene-linear stills are decoded through the same chain the QT Watcher bakes
+with — ACEScg → LogC4 → CDL → show LUT → Rec.709 — so the preview is the
+delivered look, CDL included when the selected Shot has a `.cc` in `plates/`.
+Display-referred stills and movies are shown as delivered, matching the
+watcher's `skip_color` path.
+
+Every frame is labelled with the pipeline and the tool that decoded it. When
+the show LUT can't be found (volume not mounted) or oiiotool isn't installed
+and ffmpeg has to stand in, the label says **approx** and the header warns
+**NOT the delivered look** — an approximate preview is still worth having,
+but it must not be mistaken for the real grade.
+
+| Control | Use |
+|---------|-----|
+| Frame slider / ◀ ▶ | Scrub a sequence, or step a movie frame at a time |
+| Channel | RGB, single channels, alpha, or luma — for mattes and edges |
+| Exposure / Gamma | Viewer-only stops and gamma, for checking into darks |
+| Fit / − / + | Fit to window, or zoom to inspect at pixel level |
+| Hover | Pixel coordinates and RGBA values under the cursor |
+| Open Externally | Hand the file to the system viewer (QuickTime, Preview) |
+
+Transparent areas are composited over a checkerboard, decoding runs off the
+UI thread so scrubbing stays responsive, and 3D drops say so rather than
+showing an empty frame. Preview needs `oiiotool` for EXR/DPX and `ffmpeg`
+for movies (`brew install openimageio ffmpeg`); PNG/JPG/TIFF need neither.
+
 ### Flow record
 
 **Create Flow record** makes a Version in Flow Production Tracking for
@@ -112,6 +143,7 @@ chmod +x ~/Desktop/Buffalo_Review_Drop.command
 |------|------|
 | `review_drop_app.py` | PySide6 UI |
 | `staging.py` | Media detect, copy, flag write, Flow record |
+| `preview.py` | Preview window, frame decoding, show-LUT color pipe |
 | `launch_review_drop.command` | Launcher |
 
 Bake support for `include_slate` / `skip_color` / `movie_path` lives in

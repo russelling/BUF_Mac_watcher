@@ -83,6 +83,7 @@ from PySide6.QtWidgets import (
 )
 
 import sgtk
+import preview
 import staging
 
 
@@ -111,9 +112,10 @@ class DropZone(QLabel):
     IDLE = ("Drop media here\n"
             "Images · EXR · MOV   |   3D: OBJ / FBX / GLB / PLY")
 
-    def __init__(self, on_drop, parent=None):
+    def __init__(self, on_drop, on_double_click=None, parent=None):
         super().__init__(parent)
         self._on_drop = on_drop
+        self._on_double_click = on_double_click
         self.setAcceptDrops(True)
         self.setAlignment(Qt.AlignCenter)
         self.setMinimumHeight(84)
@@ -123,6 +125,7 @@ class DropZone(QLabel):
             "background: #2a2a2a; color: #bbb; padding: 8px; font-size: 12px; }"
         )
         self.setText(self.IDLE)
+        self.setToolTip("Double-click to preview the loaded media.")
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
@@ -136,6 +139,10 @@ class DropZone(QLabel):
                 paths.append(local)
         if paths:
             self._on_drop(paths)
+
+    def mouseDoubleClickEvent(self, event):
+        if self._on_double_click:
+            self._on_double_click()
 
 
 class ReviewDropWindow(QMainWindow):
@@ -153,6 +160,7 @@ class ReviewDropWindow(QMainWindow):
         self._assets = []
         self._users = []
         self._record_pref = False
+        self._preview_window = None
 
         root = QWidget()
         root.setStyleSheet("QWidget { background: #1e1e1e; color: #ddd; }")
@@ -163,7 +171,7 @@ class ReviewDropWindow(QMainWindow):
 
         layout.addLayout(self._build_header())
 
-        self.drop = DropZone(self.on_paths_dropped)
+        self.drop = DropZone(self.on_paths_dropped, self.open_preview)
         layout.addWidget(self.drop)
 
         self.media_info = QLabel("No media loaded.")
@@ -291,11 +299,19 @@ class ReviewDropWindow(QMainWindow):
         self.btn_send.clicked.connect(self.send_to_watcher)
         self.btn_send.setEnabled(False)
         self.btn_send.setMinimumHeight(34)
+        self.btn_preview = QPushButton("Preview…")
+        self.btn_preview.clicked.connect(self.open_preview)
+        self.btn_preview.setEnabled(False)
+        self.btn_preview.setMinimumHeight(34)
+        self.btn_preview.setToolTip(
+            "Check the loaded media for visibility and color before sending."
+        )
         self.btn_ingest = QPushButton("Open 3D Ingest Folder")
         self.btn_ingest.clicked.connect(self.open_ingest)
         self.btn_ingest.setMinimumHeight(34)
-        btn_row.addWidget(self.btn_send, 2)
-        btn_row.addWidget(self.btn_ingest, 1)
+        btn_row.addWidget(self.btn_send, 3)
+        btn_row.addWidget(self.btn_preview, 1)
+        btn_row.addWidget(self.btn_ingest, 2)
         layout.addLayout(btn_row)
 
         self._update_modes()
@@ -567,7 +583,9 @@ class ReviewDropWindow(QMainWindow):
             )
             self.media = None
             self.btn_send.setEnabled(False)
+            self.btn_preview.setEnabled(False)
             self._update_modes()
+            self._refresh_preview()
             return
 
         if mt == "model_3d":
@@ -588,7 +606,9 @@ class ReviewDropWindow(QMainWindow):
             self.cmb_delivery_type.setCurrentIndex(0)
             self.media_info.setText(info)
             self.btn_send.setEnabled(True)
+            self.btn_preview.setEnabled(True)
             self._update_modes()
+            self._refresh_preview()
             self._log("Loaded 3D asset delivery")
             return
 
@@ -630,6 +650,8 @@ class ReviewDropWindow(QMainWindow):
         self.media_info.setText(info)
         self._update_modes()
         self.btn_send.setEnabled(True)
+        self.btn_preview.setEnabled(True)
+        self._refresh_preview()
         self._log("Loaded %s" % mt)
 
     def _submitted_by_fields(self):
@@ -771,10 +793,39 @@ class ReviewDropWindow(QMainWindow):
 
     def _reset_media(self):
         self.btn_send.setEnabled(False)
+        self.btn_preview.setEnabled(False)
         self.media = None
         self.drop.setText(self.drop.IDLE)
         self.media_info.setText("No media loaded.")
+        if self._preview_window is not None:
+            self._preview_window.close()
         self._update_modes()
+
+    def _shot_cdl_path(self):
+        """CDL the bake would apply to the current shot, so the preview matches."""
+        if not self.radio_shot.isChecked():
+            return None
+        ep = self.cmb_episode.currentData()
+        seq = self.cmb_sequence.currentData()
+        shot = self.cmb_shot.currentData()
+        if not (ep and seq and shot):
+            return None
+        return preview.shot_cdl_path(ep["code"], seq["code"], shot["code"])
+
+    def open_preview(self):
+        if not self.media:
+            return
+        if self._preview_window is None:
+            self._preview_window = preview.PreviewWindow(self)
+        self._preview_window.set_media(self.media, self._shot_cdl_path())
+        self._preview_window.show()
+        self._preview_window.raise_()
+        self._preview_window.activateWindow()
+
+    def _refresh_preview(self):
+        window = self._preview_window
+        if window is not None and window.isVisible():
+            window.set_media(self.media, self._shot_cdl_path())
 
     def send_to_watcher(self):
         if not self.media or not self.tk:

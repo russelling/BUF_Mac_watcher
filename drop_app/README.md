@@ -147,9 +147,24 @@ Drop into `Character` / `Prop` / `Environment` / `Vehicle` / `FX` as before.
 
 ## Requirements
 
-- ShotGrid / Flow Desktop installed (bundled Python + PySide6)
-- Network volume mounted (`atv-post-lucid3`)
-- QT Watcher running on the Mac Studio (`com.buffalovfx.qtwatcher`)
+Install these **on the Mac that launches Review Drop** (the bake machine’s
+copies are not used for preview):
+
+| Prerequisite | Why |
+|--------------|-----|
+| ShotGrid / Flow Desktop | Bundled Python + PySide6 + `sgtk` |
+| Homebrew `openimageio` | `oiiotool` — EXR / DPX preview through the show color pipe |
+| Homebrew `ffmpeg` | Movie frame scrub + EXR fallback decode |
+| Network volume `atv-post-lucid3` | Shots, LUTs, staging paths |
+| QT Watcher on the Mac Studio | Bakes and uploads after Send (`com.buffalovfx.qtwatcher`) |
+
+```bash
+brew install openimageio ffmpeg
+```
+
+The launcher checks for `oiiotool` and `ffmpeg` before starting and offers to
+run that brew install if either is missing. PNG / JPG / TIFF still preview
+without them, but EXR / DPX / MOV will not.
 
 ## Launch
 

@@ -1149,11 +1149,45 @@ class ReviewDropWindow(QMainWindow):
         )
 
 
+def _missing_preview_tools() -> list:
+    """Return names of required CLI tools the preview cannot find."""
+    missing = []
+    if not preview.find_tool(preview.OIIOTOOL, "oiiotool"):
+        missing.append("oiiotool (brew install openimageio)")
+    if not preview.find_tool(preview.FFMPEG, "ffmpeg"):
+        missing.append("ffmpeg (brew install ffmpeg)")
+    return missing
+
+
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Buffalo Review Drop")
+
+    missing = _missing_preview_tools()
+    if missing:
+        detail = "\n".join("  • %s" % item for item in missing)
+        answer = QMessageBox.warning(
+            None,
+            "Missing prerequisites",
+            "Buffalo Review Drop needs these tools on this Mac for EXR / DPX / "
+            "movie preview:\n\n%s\n\n"
+            "Install with:\n\n  brew install openimageio ffmpeg\n\n"
+            "Continue anyway? (PNG / JPG / TIFF preview still works.)"
+            % detail,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            sys.exit(1)
+
     win = ReviewDropWindow()
     win.show()
+    if missing:
+        win.log(
+            "WARNING: preview tools missing — %s. "
+            "Run: brew install openimageio ffmpeg"
+            % ", ".join(missing)
+        )
     sys.exit(app.exec())
 
 

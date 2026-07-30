@@ -63,11 +63,13 @@ delivered look, CDL included when the selected Shot has a `.cc` in `plates/`.
 Display-referred stills and movies are shown as delivered, matching the
 watcher's `skip_color` path.
 
-For EXR / HDR, the preview exposes checkboxes to turn each stage off
+For EXR / HDR, Preview exposes color-pipe **chips** to turn each stage off
 (**ACEScg → LogC4**, **CDL**, **Show LUT**) so a crushed or blown look can be
 isolated to a single step. Turning them all off clamps raw ACEScg for
-inspection. The pipeline label always reflects what is on, and marks anything
-that is no longer the delivered look as `approx`.
+inspection. Those chip settings are written into the watcher flag as
+`color_pipe`, so the QT bake matches what you previewed. The pipeline label
+always reflects what is on, and marks anything that is no longer the delivered
+look as `approx`.
 
 Every frame is labelled with the pipeline and the tool that decoded it. When
 the show LUT can't be found (volume not mounted) or oiiotool isn't installed

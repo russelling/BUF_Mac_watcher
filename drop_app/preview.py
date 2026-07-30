@@ -29,7 +29,6 @@ from typing import Optional
 from PySide6.QtCore import QObject, QRunnable, QSize, Qt, QThreadPool, Signal
 from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QFrame,
@@ -550,7 +549,16 @@ def _convert_still(
     """
     pipe = pipe or PipeOptions()
     errors = []
-    for decoder in (_oiiotool_still, _ffmpeg_still, _qlmanage_still):
+    # ffmpeg / Quick Look cannot honor per-stage toggles — using them when a
+    # stage is off made deselection look like a no-op. Prefer oiiotool then.
+    full_pipe = pipe.log_convert and pipe.cdl and pipe.show_lut
+    decoders = [_oiiotool_still]
+    if full_pipe or not linear:
+        decoders.extend([_ffmpeg_still, _qlmanage_still])
+    else:
+        decoders.append(_qlmanage_still)
+
+    for decoder in decoders:
         try:
             result = decoder(src, dst, linear, cdl_path, pipe)
         except Exception as exc:
@@ -559,6 +567,11 @@ def _convert_still(
         if result:
             return result
     detail = "; ".join(errors) if errors else tools_search_report()
+    if linear and not full_pipe and not find_tool(OIIOTOOL, "oiiotool"):
+        detail = (
+            "oiiotool is required when color-pipe stages are turned off "
+            "(brew install openimageio); %s" % detail
+        )
     raise RuntimeError(
         "no decoder available for %s — brew install openimageio ffmpeg "
         "(%s)" % (src.suffix.upper().lstrip("."), detail)
@@ -912,6 +925,9 @@ VALUE_CSS = theme.VALUE_CSS
 class PreviewWindow(QDialog):
     """Non-modal viewer for whatever is currently loaded in the drop app."""
 
+    # Emitted when a color-pipe chip changes so Send can bake the same stages.
+    pipe_changed = Signal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlag(Qt.Window, True)
@@ -940,6 +956,7 @@ class PreviewWindow(QDialog):
         self._media = None
         self._cdl_path = None
         self._pipe = PipeOptions()
+        self._pipe_signals_blocked = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -971,24 +988,34 @@ class PreviewWindow(QDialog):
 
     def _build_pipe_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setSpacing(12)
+        row.setSpacing(8)
         title = QLabel("Color pipe")
         title.setStyleSheet(LABEL_CSS)
         row.addWidget(title)
 
-        self.chk_log = QCheckBox("ACEScg → LogC4")
+        self.chk_log = QPushButton("ACEScg → LogC4")
+        self.chk_log.setCheckable(True)
         self.chk_log.setChecked(True)
-        self.chk_log.setToolTip("Scene-linear to LogC4 convert (first stage of the bake).")
-        self.chk_cdl = QCheckBox("CDL")
+        self.chk_log.setToolTip(
+            "Scene-linear to LogC4 convert. Off for inspection — also applied on Send."
+        )
+        self.chk_cdl = QPushButton("CDL")
+        self.chk_cdl.setCheckable(True)
         self.chk_cdl.setChecked(True)
-        self.chk_cdl.setToolTip("Per-shot .cc from plates/, when one exists.")
-        self.chk_lut = QCheckBox("Show LUT")
+        self.chk_cdl.setToolTip(
+            "Per-shot .cc from plates/, when one exists. Off skips CDL on Send too."
+        )
+        self.chk_lut = QPushButton("Show LUT")
+        self.chk_lut.setCheckable(True)
         self.chk_lut.setChecked(True)
-        self.chk_lut.setToolTip("Show cube → Rec.709. Off leaves LogC4 / ACEScg for inspection.")
+        self.chk_lut.setToolTip(
+            "Show cube → Rec.709. Off leaves LogC4 / ACEScg for inspection (and on Send)."
+        )
 
-        for box in (self.chk_log, self.chk_cdl, self.chk_lut):
-            box.toggled.connect(self._on_pipe_toggled)
-            row.addWidget(box)
+        for chip in (self.chk_log, self.chk_cdl, self.chk_lut):
+            chip.setStyleSheet(theme.CHIP_CSS)
+            chip.toggled.connect(self._on_pipe_toggled)
+            row.addWidget(chip)
 
         row.addStretch()
         self.lbl_pipe_hint = QLabel("")
@@ -1126,14 +1153,34 @@ class PreviewWindow(QDialog):
             show_lut=self.chk_lut.isChecked(),
         )
 
+    def pipe_options_dict(self) -> dict:
+        pipe = self._pipe_from_ui()
+        return {
+            "log_convert": pipe.log_convert,
+            "cdl": pipe.cdl,
+            "show_lut": pipe.show_lut,
+        }
+
+    def set_pipe_options(self, options: dict | None):
+        """Apply pipe stage state from the parent drop app (no decode yet)."""
+        options = options or {}
+        self._pipe_signals_blocked = True
+        try:
+            self.chk_log.setChecked(bool(options.get("log_convert", True)))
+            self.chk_cdl.setChecked(bool(options.get("cdl", True)))
+            self.chk_lut.setChecked(bool(options.get("show_lut", True)))
+        finally:
+            self._pipe_signals_blocked = False
+        self._pipe = self._pipe_from_ui()
+
     def _sync_pipe_controls(self):
-        """Enable pipe toggles only for scene-linear stills."""
+        """Enable pipe chips only for scene-linear stills."""
         linear = isinstance(self._source, StillSource) and self._source.linear
         has_cdl = bool(
             linear and self._cdl_path and os.path.exists(self._cdl_path)
         )
-        for box in (self.chk_log, self.chk_lut):
-            box.setEnabled(linear)
+        for chip in (self.chk_log, self.chk_lut):
+            chip.setEnabled(linear)
         self.chk_cdl.setEnabled(linear and has_cdl)
         if not linear:
             self.lbl_pipe_hint.setText("Pipe applies to EXR / HDR only.")
@@ -1143,9 +1190,12 @@ class PreviewWindow(QDialog):
             self.lbl_pipe_hint.setText(os.path.basename(self._cdl_path))
 
     def _on_pipe_toggled(self, *_args):
-        if not isinstance(self._source, StillSource) or not self._source.linear:
+        if self._pipe_signals_blocked:
             return
         self._pipe = self._pipe_from_ui()
+        self.pipe_changed.emit(self.pipe_options_dict())
+        if not isinstance(self._source, StillSource) or not self._source.linear:
+            return
         self._source.pipe = self._pipe
         self._cache.clear()
         self._frame = None

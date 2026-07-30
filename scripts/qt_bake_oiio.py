@@ -337,58 +337,87 @@ def is_shot_context(data):
 # Color bake: single EXR frame -> baked PNG (for slate) or baked EXR (frames)
 # ---------------------------------------------------------------------------
 
-def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
-               desqueeze_to=None, fit_to=None):
+def color_pipe_stages(data, skip_color=False):
     """
-    Apply full color pipeline to a single EXR frame using oiiotool:
+    Per-stage color pipe from the Review Drop flag.
+
+    Flag shape (all default True when absent — matches historical bakes):
+      "color_pipe": {"log_convert": bool, "cdl": bool, "show_lut": bool}
+    """
+    if skip_color:
+        return False, False, False
+    pipe = data.get("color_pipe") or {}
+    return (
+        bool(pipe.get("log_convert", True)),
+        bool(pipe.get("cdl", True)),
+        bool(pipe.get("show_lut", True)),
+    )
+
+
+def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
+               desqueeze_to=None, fit_to=None, apply_log_convert=True,
+               apply_cdl=True):
+    """
+    Apply the show color pipeline to a single EXR frame using oiiotool:
         ACEScg -> LogC4 -> CDL (optional) -> Show LUT -> Rec.709
+
+    Stages can be turned off (Review Drop preview / color_pipe flag) for
+    inspection. Defaults keep the historical full bake.
 
     cdl_path     : path to a per-shot .cc to apply, or None to skip.
     use_show_lut : if True (and the LUT file exists), apply the show LUT for
-                   the final LogC4->Rec.709 step. If False, fall back to a
-                   generic LogC4->Rec.709 colorspace conversion.
-    desqueeze_to : (width, height) to resize the frame to FIRST, for
-                   anamorphic de-squeeze. None means no de-squeeze.
-    fit_to       : (width, height) final delivery size. The (de-squeezed)
-                   image is letterboxed/pillarboxed to fit EXACTLY this box,
-                   preserving aspect with black bars. None means no fit.
+                   the final LogC4->Rec.709 step. If False and log convert is
+                   on, fall back to a generic LogC4 display transform only
+                   when show_lut was requested but the cube is missing.
+    apply_log_convert / apply_cdl : per-stage enables from color_pipe.
+    desqueeze_to / fit_to : geometry (see prior docstring).
 
     Output is an 8-bit PNG suitable for ffmpeg input.
     """
+    want_cdl = bool(apply_cdl and cdl_path and os.path.exists(cdl_path))
+    lut_exists = os.path.exists(SHOW_LUT_PATH)
+    apply_lut = bool(use_show_lut and lut_exists)
+    # Display fallback only when the artist asked for the show look, the cube
+    # is missing, and we still have LogC4 to display from.
+    use_display = bool(use_show_lut and not lut_exists and apply_log_convert)
+
+    # Nothing from the show pipe: clamp scene-linear (inspection mode).
+    if not apply_log_convert and not want_cdl and not apply_lut and not use_display:
+        cmd = [OIIOTOOL, src_exr]
+        if desqueeze_to is not None:
+            dw, dh = desqueeze_to
+            cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+        if fit_to is not None:
+            fw, fh = fit_to
+            cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+        cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
+        run(cmd, label="Raw clamp: %s" % os.path.basename(src_exr))
+        return
+
     # The OCIO config must be set ONCE, up front, via the top-level
     # --colorconfig flag. It is NOT a valid modifier on --colorconvert or
     # --ociofiletransform (those only accept key=/value=/unpremult=/etc).
     cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
 
-    # Step 1: ACEScg -> LogC4 via OCIO
-    cmd += [
-        "--colorconvert",
-        OCIO_ACESCG,
-        OCIO_LOGC4,
-    ]
+    if apply_log_convert:
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
 
-    # Step 2: CDL if present (caller has already decided and logged).
-    if cdl_path and os.path.exists(cdl_path):
+    if want_cdl:
         cmd += ["--ociofiletransform", cdl_path]
 
-    # Step 3: Show LUT -> Rec.709, or fallback display transform.
-    if use_show_lut and os.path.exists(SHOW_LUT_PATH):
+    if apply_lut:
         cmd += ["--ociofiletransform", SHOW_LUT_PATH]
-    else:
+    elif use_display:
         cmd += [
             "--ociodisplay:from=%s" % OCIO_LOGC4,
             OCIO_REC709_DISPLAY,
             OCIO_REC709_VIEW,
         ]
 
-    # Step 4: anamorphic de-squeeze (deliberately change aspect, so resize to
-    # the exact de-squeezed pixel size). Lanczos3 is a sharp resample filter.
     if desqueeze_to is not None:
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
 
-    # Step 5: fit/letterbox to the fixed delivery size. pad=1 forces the
-    # output to be EXACTLY fit_to with black bars, preserving aspect.
     if fit_to is not None:
         fw, fh = fit_to
         cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
@@ -397,7 +426,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
     # NOTE: --clamp takes min=/max= as colon-appended MODIFIERS, not
     # positional args. "--clamp 0 1" makes oiiotool treat 0 and 1 as input
     # filenames (-> "File does not exist: 0").
-    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
+    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
 
     run(cmd, label="Color bake: %s" % os.path.basename(src_exr))
 
@@ -418,45 +447,52 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, fit_to=None):
     run(cmd, label="Passthrough: %s" % os.path.basename(src_path))
 
 
-def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size):
+def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size,
+                   apply_log_convert=True, apply_cdl=True):
     """
-    Same color pipeline as bake_frame (ACEScg -> LogC4 -> CDL -> Show LUT ->
-    Rec.709), but for a small slate collage print rather than a delivery
-    frame: resizes directly to the exact (w, h) box with NO letterbox
-    padding, since the collage prints sit on the slate's own black/white
-    border treatment rather than needing to preserve source aspect exactly.
-    A small amount of aspect distortion at thumbnail size is an acceptable
-    tradeoff for filling the print cleanly.
+    Same color stages as bake_frame, but resized to an exact thumbnail box
+    with no letterbox padding for the slate collage.
+    """
+    # Reuse bake_frame into a temp-sized fit, then resize — keep one color path.
+    # Direct command keeps slate thumbs self-contained (existing convention).
+    want_cdl = bool(apply_cdl and cdl_path and os.path.exists(cdl_path))
+    lut_exists = os.path.exists(SHOW_LUT_PATH)
+    apply_lut = bool(use_show_lut and lut_exists)
+    use_display = bool(use_show_lut and not lut_exists and apply_log_convert)
+    w, h = size
 
-    Deliberately a standalone function (not sharing code with bake_frame)
-    per the existing convention in this file - keeps each bake path self
-    contained and easy to reason about independently.
-    """
+    if not apply_log_convert and not want_cdl and not apply_lut and not use_display:
+        cmd = [OIIOTOOL, src_exr]
+        if desqueeze_to is not None:
+            dw, dh = desqueeze_to
+            cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+        cmd += [
+            "--resize:filter=lanczos3", "%dx%d" % (w, h),
+            "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png,
+        ]
+        run(cmd, label="Thumbnail clamp: %s" % os.path.basename(src_exr))
+        return
+
     cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
-
-    cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
-
-    if cdl_path and os.path.exists(cdl_path):
+    if apply_log_convert:
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
+    if want_cdl:
         cmd += ["--ociofiletransform", cdl_path]
-
-    if use_show_lut and os.path.exists(SHOW_LUT_PATH):
+    if apply_lut:
         cmd += ["--ociofiletransform", SHOW_LUT_PATH]
-    else:
+    elif use_display:
         cmd += [
             "--ociodisplay:from=%s" % OCIO_LOGC4,
             OCIO_REC709_DISPLAY,
             OCIO_REC709_VIEW,
         ]
-
     if desqueeze_to is not None:
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
-
-    w, h = size
-    cmd += ["--resize:filter=lanczos3", "%dx%d" % (w, h)]
-
-    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
-
+    cmd += [
+        "--resize:filter=lanczos3", "%dx%d" % (w, h),
+        "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png,
+    ]
     run(cmd, label="Thumbnail bake: %s" % os.path.basename(src_exr))
 
 
@@ -569,23 +605,16 @@ def _esc_drawtext(s):
 
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                      tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to,
-                     skip_color=False):
+                     skip_color=False, apply_log_convert=True, apply_cdl=True):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
     background, a row of three equal-size frame thumbnails (first/mid/last)
     below it, the show logo top right, and a grayscale + color bar reference
-    strip along the bottom. The three thumbnails are run through the same
-    full color pipeline as the deliverable frames (ACEScg -> LogC4 -> CDL ->
-    Show LUT -> Rec.709), so they match the graded look of the shot rather
-    than showing raw/log plates.
+    strip along the bottom. Thumbnails use the same color stages as the
+    deliverable frames (including color_pipe toggles from Review Drop).
 
     width/height are the OUTPUT dimensions - must match the (possibly
     de-squeezed) image frames so concat/append doesn't mismatch.
-
-    tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to are passed
-    through from bake_sequence() so the thumbnails can be baked with the
-    exact same color decisions (CDL presence, show LUT presence, de-squeeze)
-    already resolved for the main bake - no re-deriving them here.
     """
     is_shot = is_shot_context(data)
 
@@ -678,14 +707,17 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
             bake_thumbnail(
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
                 cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+                apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
                 cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+                apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
                 cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+                apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
             )
     else:
         print(
@@ -790,10 +822,12 @@ def bake_sequence(data, output_paths):
       include_slate  - bool, default True
       skip_color     - bool, default False (MOV/QT sources)
       movie_path     - path to an existing .mov/.mp4 when skip_color is True
+      color_pipe     - {log_convert, cdl, show_lut} stage toggles (default all on)
     """
     include_slate = data.get("include_slate", True)
     skip_color = data.get("skip_color", False)
     movie_path = data.get("movie_path")
+    apply_log, apply_cdl_stage, want_show_lut = color_pipe_stages(data, skip_color)
 
     if skip_color and movie_path:
         bake_movie_passthrough(data, output_paths, movie_path, include_slate)
@@ -805,13 +839,17 @@ def bake_sequence(data, output_paths):
     # Resolve the source start timecode (flag -> EXR -> frame-derived).
     start_tc, tc_source = resolve_start_timecode(data, exr_pattern, first)
     print("[qt_bake_oiio] Start TC: %s (source: %s)" % (start_tc, tc_source))
-    print("[qt_bake_oiio] include_slate=%s skip_color=%s" % (include_slate, skip_color))
+    print(
+        "[qt_bake_oiio] include_slate=%s skip_color=%s "
+        "color_pipe={log_convert=%s, cdl=%s, show_lut=%s}"
+        % (include_slate, skip_color, apply_log, apply_cdl_stage, want_show_lut)
+    )
 
     # CDL path (shots only — assets skip CDL). CDL is an optional creative
     # grade: if absent, skip it but log so it's visible that the QT is
-    # ungraded.
+    # ungraded. color_pipe.cdl=False forces skip even when a .cc exists.
     cdl_path = None
-    if is_shot_context(data) and not skip_color:
+    if is_shot_context(data) and not skip_color and apply_cdl_stage:
         shot = data.get("shot_code", "")
         episode = str(data.get("episode", ""))
         # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
@@ -828,15 +866,18 @@ def bake_sequence(data, output_paths):
     else:
         if skip_color:
             print("[qt_bake_oiio] CDL/LUT: skipped (skip_color)")
+        elif not apply_cdl_stage:
+            print("[qt_bake_oiio] CDL: skipped (color_pipe.cdl=false)")
         else:
             print("[qt_bake_oiio] CDL: skipped (asset turntable)")
 
-    # Show LUT presence: decided once. If missing, fall back to a generic
-    # LogC4->Rec.709 conversion (viewable, roughly correct) rather than
-    # shipping flat log. Log it loudly since the look will differ from final.
-    use_show_lut = (not skip_color) and os.path.exists(SHOW_LUT_PATH)
-    if skip_color:
+    # Show LUT: flag can turn the stage off; missing cube falls back inside
+    # bake_frame when log convert is still on.
+    use_show_lut = (not skip_color) and want_show_lut and os.path.exists(SHOW_LUT_PATH)
+    if skip_color or not want_show_lut:
         use_show_lut = False
+        if not skip_color and not want_show_lut:
+            print("[qt_bake_oiio] Show LUT: skipped (color_pipe.show_lut=false)")
     elif use_show_lut:
         print("[qt_bake_oiio] Show LUT: applying %s" % SHOW_LUT_PATH)
     else:
@@ -845,6 +886,11 @@ def bake_sequence(data, output_paths):
             "transform '%s' / '%s'. Look will differ from final show look."
             % (SHOW_LUT_PATH, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
         )
+        # Keep want_show_lut so bake_frame can use the display fallback.
+        use_show_lut = want_show_lut
+
+    if not apply_log:
+        print("[qt_bake_oiio] LogC4 convert: skipped (color_pipe.log_convert=false)")
 
     # Anamorphic de-squeeze + fixed delivery size. Read the pixel aspect
     # ratio and resolution ONCE from the first frame (a sequence shares one
@@ -892,6 +938,7 @@ def bake_sequence(data, output_paths):
                 bake_frame(
                     src, dst, cdl_path=cdl_path, use_show_lut=use_show_lut,
                     desqueeze_to=desqueeze_to, fit_to=fit_to,
+                    apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
                 )
             baked_frames.append(dst)
 
@@ -907,6 +954,7 @@ def bake_sequence(data, output_paths):
                 tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
                 use_show_lut=use_show_lut, desqueeze_to=desqueeze_to,
                 skip_color=skip_color,
+                apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
             )
 
         # ── 3. Build frame list for FFmpeg concat ─────────────────────────────

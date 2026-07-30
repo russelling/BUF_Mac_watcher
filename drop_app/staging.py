@@ -158,6 +158,7 @@ def stage_and_flag(
     media: dict,
     context: dict,
     include_slate: bool,
+    color_pipe: dict | None = None,
 ) -> Path:
     """
     Copy media into the pipeline render/work area and write a
@@ -180,6 +181,13 @@ def stage_and_flag(
 
     is_shot = context["entity_type"] == "Shot"
     skip_color = bool(media.get("skip_color")) or media["media_type"] == "movie"
+    # Preview color-pipe chips → bake stages. Defaults keep the full show look.
+    pipe = color_pipe or {}
+    color_pipe_flag = {
+        "log_convert": bool(pipe.get("log_convert", True)),
+        "cdl": bool(pipe.get("cdl", True)),
+        "show_lut": bool(pipe.get("show_lut", True)),
+    }
 
     if is_shot:
         episode = context["episode"]
@@ -245,6 +253,7 @@ def stage_and_flag(
             "movie_path": movie_path,
             "skip_color": skip_color,
             "include_slate": include_slate,
+            "color_pipe": color_pipe_flag,
             "submitted_for": context.get("submitted_for") or "Internal Review",
             "description": context.get("description") or "Review Drop",
             "task_id": context.get("task_id"),
@@ -314,6 +323,7 @@ def stage_and_flag(
             "movie_path": movie_path,
             "skip_color": skip_color,
             "include_slate": include_slate,
+            "color_pipe": color_pipe_flag,
             "submitted_for": context.get("submitted_for") or "Internal Review",
             "description": context.get("description") or "Review Drop",
             "task_id": context.get("task_id"),

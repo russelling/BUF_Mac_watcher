@@ -285,6 +285,81 @@ QPushButton:checked {{
 }}
 """
 
+# Toggle chips for color-pipe stages (checkable). Selected = stage on.
+CHIP_CSS = f"""
+QPushButton {{
+    background: {SURFACE_RAISED};
+    color: {INK_MUTED};
+    border: 1px solid {STRUCTURE_LINE};
+    border-radius: {RADIUS_TIGHT};
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 500;
+}}
+QPushButton:hover {{
+    background: {STRUCTURE_SOFT};
+    border-color: {STRUCTURE};
+    color: {STRUCTURE};
+}}
+QPushButton:checked {{
+    background: {STRUCTURE};
+    border-color: {FOREST};
+    color: {WHITE};
+}}
+QPushButton:checked:hover {{
+    background: {OLIVE};
+    border-color: {FOREST};
+    color: {WHITE};
+}}
+QPushButton:disabled {{
+    background: {PALE_GRAY};
+    color: {INK_FAINT};
+    border-color: {STRUCTURE_LINE};
+}}
+"""
+
+# Shot / Asset entity switch — tab strip, one selected.
+ENTITY_TAB_CSS = f"""
+QPushButton {{
+    background: transparent;
+    color: {STRUCTURE};
+    border: none;
+    border-radius: 0px;
+    padding: 8px 22px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 88px;
+}}
+QPushButton:hover {{
+    background: {SURFACE_RAISED};
+    color: {FOREST};
+}}
+QPushButton:checked {{
+    background: {FOREST};
+    color: {WHITE};
+}}
+QPushButton:checked:hover {{
+    background: {OLIVE};
+    color: {WHITE};
+}}
+QPushButton#EntityTabShot {{
+    border-top-left-radius: {RADIUS_TIGHT};
+    border-bottom-left-radius: {RADIUS_TIGHT};
+}}
+QPushButton#EntityTabAsset {{
+    border-top-right-radius: {RADIUS_TIGHT};
+    border-bottom-right-radius: {RADIUS_TIGHT};
+}}
+"""
+
+ENTITY_TAB_ROW_CSS = f"""
+QWidget#EntityTabRow {{
+    background: {STRUCTURE_SOFT};
+    border: 1px solid {STRUCTURE_LINE};
+    border-radius: {RADIUS_TIGHT};
+}}
+"""
+
 STATUS_CSS = f"""
 QTextEdit {{
     background: {MIDNIGHT};

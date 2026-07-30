@@ -76,7 +76,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QRadioButton,
     QCheckBox,
     QTextEdit,
     QVBoxLayout,
@@ -221,6 +220,13 @@ class ReviewDropWindow(QMainWindow):
         self._users = []
         self._record_pref = False
         self._preview_window = None
+        # Color-pipe stages shared with Preview chips and written into the
+        # QT Watcher flag so deselection carries through to the bake.
+        self._color_pipe = {
+            "log_convert": True,
+            "cdl": True,
+            "show_lut": True,
+        }
         self._schema_fields = {}
         self._seq_episode_field = None
         self._shot_sequence_field = None
@@ -243,19 +249,30 @@ class ReviewDropWindow(QMainWindow):
         self.media_info.setStyleSheet(theme.MEDIA_INFO_CSS)
         layout.addWidget(self.media_info)
 
-        # Entity type
-        type_row = QHBoxLayout()
-        type_row.setSpacing(12)
-        self.radio_shot = QRadioButton("Shot")
-        self.radio_asset = QRadioButton("Asset")
+        # Entity type — tab strip (Shot | Asset)
+        tab_host = QWidget()
+        tab_host.setObjectName("EntityTabRow")
+        tab_host.setStyleSheet(theme.ENTITY_TAB_ROW_CSS)
+        type_row = QHBoxLayout(tab_host)
+        type_row.setContentsMargins(0, 0, 0, 0)
+        type_row.setSpacing(0)
+        self.radio_shot = QPushButton("Shot")
+        self.radio_shot.setObjectName("EntityTabShot")
+        self.radio_asset = QPushButton("Asset")
+        self.radio_asset.setObjectName("EntityTabAsset")
+        for tab in (self.radio_shot, self.radio_asset):
+            tab.setCheckable(True)
+            tab.setStyleSheet(theme.ENTITY_TAB_CSS)
+            tab.setCursor(Qt.PointingHandCursor)
         self.radio_shot.setChecked(True)
         self.type_group = QButtonGroup(self)
+        self.type_group.setExclusive(True)
         self.type_group.addButton(self.radio_shot)
         self.type_group.addButton(self.radio_asset)
         type_row.addWidget(self.radio_shot)
         type_row.addWidget(self.radio_asset)
         type_row.addStretch()
-        layout.addLayout(type_row)
+        layout.addWidget(tab_host)
         self.radio_shot.toggled.connect(self._on_type_changed)
 
         # ── Two-column body: context (left) + delivery fields (right) ──────────
@@ -1057,10 +1074,19 @@ class ReviewDropWindow(QMainWindow):
                 return
         if self._preview_window is None:
             self._preview_window = preview.PreviewWindow(self)
+            self._preview_window.pipe_changed.connect(self._on_preview_pipe_changed)
+        self._preview_window.set_pipe_options(self._color_pipe)
         self._preview_window.set_media(self.media, self._shot_cdl_path())
         self._preview_window.show()
         self._preview_window.raise_()
         self._preview_window.activateWindow()
+
+    def _on_preview_pipe_changed(self, options: dict):
+        self._color_pipe = {
+            "log_convert": bool(options.get("log_convert", True)),
+            "cdl": bool(options.get("cdl", True)),
+            "show_lut": bool(options.get("show_lut", True)),
+        }
 
     def _refresh_preview(self):
         window = self._preview_window
@@ -1133,7 +1159,12 @@ class ReviewDropWindow(QMainWindow):
             include_slate = self.chk_slate.isChecked()
             # Single-frame slate is optional; sequences default on but still respect checkbox
             flag_path = staging.stage_and_flag(
-                self.tk, self.sg, self.media, context, include_slate
+                self.tk,
+                self.sg,
+                self.media,
+                context,
+                include_slate,
+                color_pipe=self._color_pipe,
             )
             self._log("Staged + flag written:\n%s" % flag_path)
             QMessageBox.information(

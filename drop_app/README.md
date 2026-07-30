@@ -44,8 +44,8 @@ the list. On submit the typed code is matched against what was loaded, then
 looked up live in Flow (so a shot created since launch is found), and only
 if it exists nowhere are you asked whether to create it. Created entities
 carry the project and the links above them — Sequence → Episode, Shot →
-Sequence, Asset → Type — and any field your site doesn't have is skipped
-with a warning rather than sent.
+Sequence, Asset → `sg_asset_type` (short code) — and any field your site
+doesn't have is skipped with a warning rather than sent.
 
 ### Reference media and original sources
 

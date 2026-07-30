@@ -87,10 +87,10 @@ but it must not be mistaken for the real grade.
 Transparent areas are composited over a checkerboard, decoding runs off the
 UI thread so scrubbing stays responsive, and 3D drops say so rather than
 showing an empty frame. Preview needs `oiiotool` for EXR/DPX and `ffmpeg`
-for movies on this Mac (`brew install openimageio ffmpeg`) — the bake
-machine's install is not enough if you launch Review Drop on a workstation
-without those tools. PNG/JPG/TIFF need neither. If both are missing on
-macOS, Preview falls back to a Quick Look thumbnail and labels it `approx`.
+for movies on this Mac (`brew install openimageio ffmpeg`) — only when
+you open Preview, not to launch or Send. The bake machine's install is
+not used. PNG/JPG/TIFF need neither. If both are missing on macOS,
+Preview falls back to a Quick Look thumbnail and labels it `approx`.
 
 ### Flow record
 
@@ -147,24 +147,23 @@ Drop into `Character` / `Prop` / `Environment` / `Vehicle` / `FX` as before.
 
 ## Requirements
 
-Install these **on the Mac that launches Review Drop** (the bake machine’s
-copies are not used for preview):
+| Prerequisite | When |
+|--------------|------|
+| ShotGrid / Flow Desktop | Always (bundled Python + PySide6 + `sgtk`) |
+| Network volume `atv-post-lucid3` | Always (shots, LUTs, staging) |
+| QT Watcher on the Mac Studio | After Send (`com.buffalovfx.qtwatcher`) |
+| Homebrew `openimageio` / `ffmpeg` | **Only when Preview is used** on EXR / DPX / MOV |
 
-| Prerequisite | Why |
-|--------------|-----|
-| ShotGrid / Flow Desktop | Bundled Python + PySide6 + `sgtk` |
-| Homebrew `openimageio` | `oiiotool` — EXR / DPX preview through the show color pipe |
-| Homebrew `ffmpeg` | Movie frame scrub + EXR fallback decode |
-| Network volume `atv-post-lucid3` | Shots, LUTs, staging paths |
-| QT Watcher on the Mac Studio | Bakes and uploads after Send (`com.buffalovfx.qtwatcher`) |
+Send, reference copy, and 3D ingest do not need `oiiotool` or `ffmpeg`.
+PNG / JPG / TIFF preview uses Qt only. Previewing EXR / DPX / MOV on this
+Mac needs:
 
 ```bash
 brew install openimageio ffmpeg
 ```
 
-The launcher checks for `oiiotool` and `ffmpeg` before starting and offers to
-run that brew install if either is missing. PNG / JPG / TIFF still preview
-without them, but EXR / DPX / MOV will not.
+(The bake machine’s install is not used.) If those tools are missing when
+you click **Preview…**, the app tells you and offers the brew command.
 
 ## Launch
 

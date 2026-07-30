@@ -1037,6 +1037,24 @@ class ReviewDropWindow(QMainWindow):
     def open_preview(self):
         if not self.media:
             return
+        missing = _missing_tools_for_media(self.media)
+        if missing:
+            detail = "\n".join("  • %s" % item for item in missing)
+            answer = QMessageBox.warning(
+                self,
+                "Preview tools required",
+                "This media needs the following on this Mac to preview:\n\n"
+                "%s\n\n"
+                "Install with:\n\n"
+                "  brew install openimageio ffmpeg\n\n"
+                "Send / reference / 3D ingest do not need these tools.\n\n"
+                "Open Preview anyway?"
+                % detail,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
         if self._preview_window is None:
             self._preview_window = preview.PreviewWindow(self)
         self._preview_window.set_media(self.media, self._shot_cdl_path())
@@ -1149,45 +1167,52 @@ class ReviewDropWindow(QMainWindow):
         )
 
 
-def _missing_preview_tools() -> list:
-    """Return names of required CLI tools the preview cannot find."""
+def _missing_tools_for_media(media: dict) -> list:
+    """
+    Tools this media needs for Preview that are not on this Mac.
+
+    Launch and Send never require these — only Preview of EXR / DPX / MOV
+    (and other non-Qt stills). PNG / JPG / TIFF need nothing external.
+    """
+    if not media:
+        return []
+    media_type = media.get("media_type")
+    if media_type == "model_3d":
+        return []
+
+    needs_oiio = False
+    needs_ffmpeg = media_type == "movie"
+
+    if media_type in ("exr_single", "exr_sequence"):
+        needs_oiio = True
+    else:
+        for path in media.get("files") or []:
+            ext = Path(path).suffix.lower()
+            if ext in preview.LINEAR_EXTS or ext in {".dpx", ".cin", ".psd", ".iff"}:
+                needs_oiio = True
+            elif ext not in preview.QT_READABLE_EXTS and media_type != "movie":
+                needs_oiio = True
+
+    # EXR can use ffmpeg as a fallback when oiiotool is absent.
+    has_oiio = bool(preview.find_tool(preview.OIIOTOOL, "oiiotool"))
+    has_ffmpeg = bool(preview.find_tool(preview.FFMPEG, "ffmpeg"))
+
     missing = []
-    if not preview.find_tool(preview.OIIOTOOL, "oiiotool"):
-        missing.append("oiiotool (brew install openimageio)")
-    if not preview.find_tool(preview.FFMPEG, "ffmpeg"):
+    if needs_ffmpeg and not has_ffmpeg:
         missing.append("ffmpeg (brew install ffmpeg)")
+    if needs_oiio and not (has_oiio or has_ffmpeg):
+        missing.append("oiiotool or ffmpeg (brew install openimageio ffmpeg)")
+    elif needs_oiio and not has_oiio and has_ffmpeg:
+        # ffmpeg alone can show an approximate EXR — not a hard blocker.
+        pass
     return missing
 
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Buffalo Review Drop")
-
-    missing = _missing_preview_tools()
-    if missing:
-        detail = "\n".join("  • %s" % item for item in missing)
-        answer = QMessageBox.warning(
-            None,
-            "Missing prerequisites",
-            "Buffalo Review Drop needs these tools on this Mac for EXR / DPX / "
-            "movie preview:\n\n%s\n\n"
-            "Install with:\n\n  brew install openimageio ffmpeg\n\n"
-            "Continue anyway? (PNG / JPG / TIFF preview still works.)"
-            % detail,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        if answer != QMessageBox.Yes:
-            sys.exit(1)
-
     win = ReviewDropWindow()
     win.show()
-    if missing:
-        win.log(
-            "WARNING: preview tools missing — %s. "
-            "Run: brew install openimageio ffmpeg"
-            % ", ".join(missing)
-        )
     sys.exit(app.exec())
 
 

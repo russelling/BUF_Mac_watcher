@@ -14,9 +14,11 @@ Bottom row order is Preview → Send → Open 3D Ingest.
 
 ### Review media (images / EXR / MOV)
 
-1. **Drag & drop** an image sequence, single still, EXR, or MOV/MP4
+1. **Drag & drop** or **click** the drop zone to browse for an image
+   sequence, single still, EXR, MOV/MP4, or 3D file
 2. Pick **Shot** (Episode → Sequence → Shot) or **Asset** from Flow
-3. Set Step / Version / Submitted by / Submitted for / Notes
+3. Set Step / Submitted by / Submitted for / Notes — **Version** autofills
+   to the next free `{Shot|Asset}_{Step}_v###` in Flow
 4. Optional **Include slate** (especially useful for single frames)
 5. Copies media into the pipeline render area and writes a
    `.render_complete_*.json` flag

@@ -152,6 +152,67 @@ def next_version(existing_dir: Path, stem_prefix: str) -> int:
     return (max(versions) + 1) if versions else 1
 
 
+def version_name_prefixes(entity_code: str, step: str, entity_type: str) -> list:
+    """
+    Version code stems the QT Watcher / Review Drop use before `_v###`.
+
+    Shot:   {Shot}_{Step}_v001
+    Asset:  {Asset}_{Step}_turntable_v001  (watcher), plus {Asset}_{Step}_v001
+    """
+    code = (entity_code or "").strip()
+    step = (step or "").strip()
+    if not code or not step:
+        return []
+    if entity_type == "Asset":
+        return [
+            "%s_%s_turntable" % (code, step),
+            "%s_%s" % (code, step),
+        ]
+    return ["%s_%s" % (code, step)]
+
+
+def next_version_from_flow(
+    sg: Any,
+    project_id: int,
+    entity_type: str,
+    entity_code: str,
+    step: str,
+) -> int:
+    """
+    Next free version number for `{entity}_{step}_v###` on this project.
+
+    Looks at Version.code values in Flow (ShotGrid) that match the watcher
+    naming convention, and returns max(existing) + 1 (or 1 if none).
+    """
+    prefixes = version_name_prefixes(entity_code, step, entity_type)
+    if not prefixes or sg is None:
+        return 1
+
+    numbers = []
+    for prefix in prefixes:
+        needle = "%s_v" % prefix
+        try:
+            rows = sg.find(
+                "Version",
+                [
+                    ["project", "is", {"type": "Project", "id": int(project_id)}],
+                    ["code", "starts_with", needle],
+                ],
+                ["code"],
+            )
+        except Exception:
+            rows = []
+        pattern = re.compile(
+            r"^%s_v(\d+)$" % re.escape(prefix),
+            re.IGNORECASE,
+        )
+        for row in rows:
+            match = pattern.match(row.get("code") or "")
+            if match:
+                numbers.append(int(match.group(1)))
+    return (max(numbers) + 1) if numbers else 1
+
+
 def stage_and_flag(
     tk: Any,
     sg: Any,

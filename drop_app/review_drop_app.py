@@ -56,7 +56,7 @@ _core_py = os.path.join(CONFIG_PATH, "install", "core", "python")
 if _core_py not in sys.path:
     sys.path.insert(0, _core_py)
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import (
     QDragEnterEvent,
     QDropEvent,
@@ -68,6 +68,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QCompleter,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -166,20 +167,28 @@ def _link_label(value) -> str:
 
 
 class DropZone(QLabel):
-    IDLE = ("Drop media here\n"
-            "Images · EXR · MOV   |   3D: OBJ / FBX / GLB / PLY")
+    IDLE = (
+        "Drop media here — or click to browse\n"
+        "Images · EXR · MOV   |   3D: OBJ / FBX / GLB / PLY"
+    )
 
-    def __init__(self, on_drop, on_double_click=None, parent=None):
+    def __init__(self, on_drop, on_double_click=None, on_browse=None, parent=None):
         super().__init__(parent)
         self._on_drop = on_drop
         self._on_double_click = on_double_click
+        self._on_browse = on_browse
+        self._ignore_browse = False
         self.setAcceptDrops(True)
         self.setAlignment(Qt.AlignCenter)
         self.setMinimumHeight(96)
         self.setWordWrap(True)
+        self.setCursor(Qt.PointingHandCursor)
         self.setStyleSheet(theme.DROP_ZONE_IDLE)
         self.setText(self.IDLE)
-        self.setToolTip("Double-click to preview the loaded media.")
+        self.setToolTip(
+            "Click to browse for files. Drop files here too. "
+            "Double-click to preview the loaded media."
+        )
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
@@ -199,9 +208,24 @@ class DropZone(QLabel):
         if paths:
             self._on_drop(paths)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if event.button() != Qt.LeftButton or not self._on_browse:
+            return
+        # Delay so a double-click can cancel the browse and open Preview.
+        QTimer.singleShot(220, self._emit_browse)
+
     def mouseDoubleClickEvent(self, event):
+        self._ignore_browse = True
         if self._on_double_click:
             self._on_double_click()
+
+    def _emit_browse(self):
+        if self._ignore_browse:
+            self._ignore_browse = False
+            return
+        if self._on_browse:
+            self._on_browse()
 
 
 class ReviewDropWindow(QMainWindow):
@@ -241,7 +265,11 @@ class ReviewDropWindow(QMainWindow):
 
         layout.addLayout(self._build_header())
 
-        self.drop = DropZone(self.on_paths_dropped, self.open_preview)
+        self.drop = DropZone(
+            self.on_paths_dropped,
+            self.open_preview,
+            self.browse_for_media,
+        )
         layout.addWidget(self.drop)
 
         self.media_info = QLabel("No media loaded.")
@@ -292,6 +320,8 @@ class ReviewDropWindow(QMainWindow):
         self.cmb_shot = _searchable_combo()
         self.cmb_episode.currentIndexChanged.connect(self._refresh_sequences)
         self.cmb_sequence.currentIndexChanged.connect(self._refresh_shots)
+        self.cmb_shot.currentIndexChanged.connect(self._autofill_version)
+        self.cmb_shot.lineEdit().editingFinished.connect(self._autofill_version)
         shot_form.addRow("Episode", self.cmb_episode)
         shot_form.addRow("Sequence", self.cmb_sequence)
         shot_form.addRow("Shot", self.cmb_shot)
@@ -304,6 +334,8 @@ class ReviewDropWindow(QMainWindow):
         self.cmb_asset_type = QComboBox()
         self.cmb_asset = _searchable_combo()
         self.cmb_asset_type.currentIndexChanged.connect(self._load_assets)
+        self.cmb_asset.currentIndexChanged.connect(self._autofill_version)
+        self.cmb_asset.lineEdit().editingFinished.connect(self._autofill_version)
         for t in ["Character", "Prop", "Environment", "Vehicle", "FX"]:
             self.cmb_asset_type.addItem(t)
         asset_form.addRow("Type", self.cmb_asset_type)
@@ -329,6 +361,10 @@ class ReviewDropWindow(QMainWindow):
         self.txt_name_override.setPlaceholderText("Optional reference filename")
         self.txt_name_override.setEnabled(False)
         self.txt_version = QLineEdit("1")
+        self.txt_version.setToolTip(
+            "Next free number for {Shot|Asset}_{Step}_v### in Flow. "
+            "Updates when you change Shot / Asset / Step."
+        )
         self.cmb_submitted_by = QComboBox()
         self.cmb_submitted = QComboBox()
         self.cmb_submitted.setEditable(True)
@@ -341,6 +377,7 @@ class ReviewDropWindow(QMainWindow):
         form.addRow("Naming override", self.txt_name_override)
         form.addRow("Step", self.cmb_step)
         form.addRow("Version", self.txt_version)
+        self.cmb_step.currentTextChanged.connect(self._autofill_version)
         form.addRow("Submitted by", self.cmb_submitted_by)
         form.addRow("Submitted for", self.cmb_submitted)
         form.addRow("Notes", self.txt_description)
@@ -450,10 +487,13 @@ class ReviewDropWindow(QMainWindow):
         is_shot = self.radio_shot.isChecked()
         self.shot_box.setVisible(is_shot)
         self.asset_box.setVisible(not is_shot)
+        self.cmb_step.blockSignals(True)
         self.cmb_step.clear()
         for s in (SHOT_STEPS if is_shot else ASSET_STEPS):
             self.cmb_step.addItem(s)
+        self.cmb_step.blockSignals(False)
         self._update_modes()
+        self._autofill_version()
 
     def _is_reference_mode(self):
         return self.cmb_delivery_type.currentText() == "Reference"
@@ -685,6 +725,7 @@ class ReviewDropWindow(QMainWindow):
                 shot["code"] + ("" if linked else NO_SEQUENCE), shot
             )
         self.cmb_shot.blockSignals(False)
+        self._autofill_version()
 
     def _load_assets(self, *_args):
         if not self.sg:
@@ -701,6 +742,64 @@ class ReviewDropWindow(QMainWindow):
                 continue
             self.cmb_asset.addItem(asset["code"], asset)
         self.cmb_asset.blockSignals(False)
+        self._autofill_version()
+
+    def browse_for_media(self):
+        """File picker for the drop zone click."""
+        exts = sorted(
+            staging.IMAGE_EXTS | staging.MOVIE_EXTS | staging.MODEL_3D_EXTS
+        )
+        patterns = " ".join("*%s" % ext for ext in exts)
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Choose review media",
+            "",
+            "Review media (%s);;All files (*)" % patterns,
+        )
+        if paths:
+            self.on_paths_dropped(paths)
+
+    def _version_entity_code(self):
+        """Shot or Asset code currently selected / typed, or None."""
+        if self.radio_shot.isChecked():
+            combo = self.cmb_shot
+            pool = self._shots
+        else:
+            combo = self.cmb_asset
+            pool = self._assets
+        chosen = combo.currentData()
+        if chosen and chosen.get("code"):
+            return chosen["code"]
+        typed = entity_code(combo.currentText())
+        if not typed:
+            return None
+        for item in pool:
+            if (item.get("code") or "").lower() == typed.lower():
+                return item["code"]
+        return typed
+
+    def _autofill_version(self, *_args, minimum=None):
+        """Set Version to the next free {entity}_{step}_v### in Flow."""
+        if not self.sg:
+            return
+        code = self._version_entity_code()
+        step = self.cmb_step.currentText().strip()
+        if not code or not step:
+            return
+        entity_type = "Shot" if self.radio_shot.isChecked() else "Asset"
+        try:
+            number = staging.next_version_from_flow(
+                self.sg, PROJECT_ID, entity_type, code, step
+            )
+        except Exception as exc:
+            self._log("Could not read next version from Flow: %s" % exc)
+            return
+        if minimum is not None:
+            try:
+                number = max(number, int(minimum))
+            except (TypeError, ValueError):
+                pass
+        self.txt_version.setText(str(number))
 
     def on_paths_dropped(self, paths):
         self.media = staging.classify_paths(paths)
@@ -1174,6 +1273,13 @@ class ReviewDropWindow(QMainWindow):
                 "The Mac Studio QT Watcher will pick this up on its next poll "
                 "(~30s).\n\nFlag:\n%s" % flag_path,
             )
+            # Watcher hasn't created the Flow Version yet — bump past what we
+            # just queued so a second Send doesn't reuse the same number.
+            try:
+                used = int(self.txt_version.text().strip() or "1")
+            except ValueError:
+                used = 1
+            self._autofill_version(minimum=used + 1)
         except Exception as exc:
             self._log("ERROR: %s" % exc)
             QMessageBox.critical(self, "Send failed", str(exc))

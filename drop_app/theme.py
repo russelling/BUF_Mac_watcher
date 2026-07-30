@@ -156,15 +156,42 @@ QScrollArea {{
     border: 1px solid {STRUCTURE_LINE};
     border-radius: {RADIUS_TIGHT};
 }}
-/* Preview pixels are painted by ImageCanvas — never style that widget. */
-#PreviewCanvas {{
-    background: {MIDNIGHT};
-    border: none;
-}}
 QToolTip {{
     background: {NAVY};
     color: {WHITE};
     border: 1px solid {STRUCTURE};
+    padding: 4px 8px;
+}}
+"""
+
+# Preview dialog only — no QLabel/QWidget background rules. APP_CSS blanks
+# image painting on Shotgun Desktop's macOS Qt; keep this narrow.
+PREVIEW_DIALOG_CSS = f"""
+QDialog {{
+    background: {WHITE};
+    color: {INK};
+}}
+QCheckBox, QRadioButton {{
+    color: {INK};
+    spacing: 8px;
+}}
+QSlider::groove:horizontal {{
+    height: 4px;
+    background: {STRUCTURE_LINE};
+    border-radius: 2px;
+}}
+QSlider::handle:horizontal {{
+    background: {STRUCTURE};
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    border-radius: 6px;
+}}
+QComboBox {{
+    background: {SURFACE_RAISED};
+    color: {INK};
+    border: 1px solid {STRUCTURE_LINE};
+    border-radius: {RADIUS_TIGHT};
     padding: 4px 8px;
 }}
 """

@@ -1,10 +1,14 @@
 #!/bin/bash
 # Launch Buffalo Review Drop (standalone Mac app).
 # Uses Shotgun/Flow Desktop's bundled Python for PySide6 + sgtk.
+#
+# Always runs the checkout that contains this script (so a git pull of the
+# feature branch is what you actually launch).
 
-APP_DIR="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/drop_app"
+APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 SG_PYTHON="/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3"
-CONFIG_CORE="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/current/install/core/python"
+VOLUME_ROOT="/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow"
+CONFIG_CORE="${VOLUME_ROOT}/current/install/core/python"
 
 if [ ! -x "$SG_PYTHON" ]; then
   echo "ERROR: Shotgun/Flow Desktop Python not found at:"
@@ -16,4 +20,15 @@ fi
 
 export PYTHONPATH="$CONFIG_CORE${PYTHONPATH:+:$PYTHONPATH}"
 cd "$APP_DIR" || exit 1
+
+# Make it obvious which checkout / commit is running (black preview was often
+# just a stale tree that never got onto the feature branch).
+if command -v git >/dev/null 2>&1; then
+  REPO_ROOT="$(cd "$APP_DIR/.." && pwd)"
+  BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+  COMMIT="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  echo "[review_drop] $APP_DIR"
+  echo "[review_drop] branch=$BRANCH commit=$COMMIT"
+fi
+
 exec "$SG_PYTHON" "$APP_DIR/review_drop_app.py"

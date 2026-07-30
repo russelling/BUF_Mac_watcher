@@ -150,7 +150,26 @@ Drop into `Character` / `Prop` / `Environment` / `Vehicle` / `FX` as before.
 
 ## Launch
 
-Double-click (or run in Terminal):
+Update the volume checkout onto the working branch first (tracked `.DS_Store`
+files used to block `git checkout` — they are untracked now):
+
+```bash
+cd "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher"
+git fetch origin
+git checkout cursor/flow-record-option-1ade
+git pull --ff-only origin cursor/flow-record-option-1ade
+```
+
+If checkout still complains about `.DS_Store`:
+
+```bash
+git rm -f --cached .DS_Store scripts/.DS_Store 2>/dev/null
+git checkout -f cursor/flow-record-option-1ade
+git pull --ff-only origin cursor/flow-record-option-1ade
+```
+
+Then double-click (or run in Terminal) — the launcher prints the branch and
+commit so you can confirm you are not on a stale tree:
 
 ```bash
 bash "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/drop_app/launch_review_drop.command"

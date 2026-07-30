@@ -27,15 +27,18 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QObject, QRunnable, QSize, Qt, QThreadPool, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QFrame,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QSlider,
     QVBoxLayout,
@@ -161,32 +164,54 @@ def _first_error_line(output: str, tool: str) -> str:
 # ---------------------------------------------------------------------------
 
 class DecodedFrame:
+    """
+    A decoded preview frame.
+
+    The worker only writes a PNG (or points at a display-referred original).
+    QImage / QPixmap are loaded on the GUI thread from display_path — crossing
+    threads with QImage/QPixmap is a known black-frame failure on macOS Qt.
+    """
+
     def __init__(
         self,
-        image: QImage,
         pipeline: str,
         tool: str,
         source: Path,
         display_path: Optional[Path] = None,
+        image: Optional[QImage] = None,
     ):
-        # Copy so the worker thread's buffer can't disappear under the GUI.
-        self.image = image.copy() if not image.isNull() else image
         self.pipeline = pipeline
         self.tool = tool
-        self.source = source
-        # Prefer reloading this PNG on the GUI thread — most reliable on macOS.
+        self.source = Path(source)
         self.display_path = Path(display_path) if display_path else None
+        self._image = (
+            image.copy() if image is not None and not image.isNull() else None
+        )
 
     @property
     def matches_delivery(self) -> bool:
         return "approx" not in self.pipeline.lower()
 
+    @property
+    def image(self) -> QImage:
+        if self._image is not None and not self._image.isNull():
+            return self._image
+        if self.display_path and self.display_path.is_file():
+            loaded = QImage(str(self.display_path))
+            if not loaded.isNull():
+                self._image = loaded
+                return self._image
+        return QImage()
+
     def pixmap(self) -> QPixmap:
         if self.display_path and self.display_path.is_file():
-            pix = QPixmap(str(self.display_path))
-            if not pix.isNull():
+            pix = QPixmap()
+            if pix.load(str(self.display_path)) and not pix.isNull():
                 return pix
-        return QPixmap.fromImage(self.image)
+        img = self.image
+        if img.isNull():
+            return QPixmap()
+        return QPixmap.fromImage(img)
 
 
 class FrameSource:
@@ -240,13 +265,13 @@ class StillSource(FrameSource):
         ext = src.suffix.lower()
         pipe = self.pipe
 
-        # Display-referred: Qt can decode these; the show pipe does not apply.
+        # Display-referred: point at the original; GUI thread loads the pixmap.
         if not self.linear and ext in QT_READABLE_EXTS:
-            image = QImage(str(src))
-            if not image.isNull():
-                return DecodedFrame(
-                    image, "as delivered (display-referred)", "Qt", src, src
-                )
+            if not src.is_file() or src.stat().st_size <= 0:
+                raise RuntimeError("image file is missing or empty: %s" % src.name)
+            return DecodedFrame(
+                "as delivered (display-referred)", "Qt", src, src
+            )
 
         # Include pipe state in the temp name so toggling stages can't
         # accidentally reuse a previous bake sitting on disk.
@@ -257,10 +282,9 @@ class StillSource(FrameSource):
         )
         dst = self.tmpdir / ("frame_%s_%04d.png" % (tag, index))
         pipeline, tool = _convert_still(src, dst, self.linear, self.cdl_path, pipe)
-        image = QImage(str(dst))
-        if image.isNull():
+        if not dst.is_file() or dst.stat().st_size <= 0:
             raise RuntimeError("decoded frame could not be read back")
-        return DecodedFrame(image, pipeline, tool, src, dst)
+        return DecodedFrame(pipeline, tool, src, dst)
 
     def unavailable_reason(self):
         ext = self.files[0].suffix.lower()
@@ -353,11 +377,10 @@ class MovieSource(FrameSource):
             "-ss", "%.4f" % seconds, "-i", str(self.movie_path),
             "-frames:v", "1", str(dst),
         ])
-        image = QImage(str(dst))
-        if image.isNull():
+        if not dst.is_file() or dst.stat().st_size <= 0:
             raise RuntimeError("ffmpeg produced no frame at %.2fs" % seconds)
         return DecodedFrame(
-            image, "as delivered (no color pipe)", "ffmpeg", self.movie_path, dst
+            "as delivered (no color pipe)", "ffmpeg", self.movie_path, dst
         )
 
     def unavailable_reason(self):
@@ -634,13 +657,13 @@ def _isolate_channel(image: QImage, channel: str) -> QImage:
     return gray.copy()
 
 
-class ImageCanvas(QWidget):
+class ImageCanvas(QGraphicsView):
     """
-    Frame viewer painted with QPainter — never a styled QLabel.
+    Frame viewer via QGraphicsView — avoids QLabel/stylesheet black frames.
 
-    PreviewWindow applies APP_CSS, which styles every QLabel. On several
-    Qt/macOS builds that replaces QLabel pixmap painting and leaves a black
-    rectangle. Drawing here keeps the pixels independent of that stylesheet.
+    PreviewWindow must not apply APP_CSS (it styles every QLabel/QWidget and
+    blanks pixmaps on Shotgun Desktop's macOS Qt). This view uses a brush
+    background and a scene pixmap item only.
     """
 
     probed = Signal(int, int)
@@ -648,33 +671,52 @@ class ImageCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("PreviewCanvas")
-        self.setMouseTracking(True)
         self.setMinimumSize(320, 240)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # Background via palette only — no stylesheet on this widget either.
-        self.setAutoFillBackground(True)
-        pal = self.palette()
-        pal.setColor(self.backgroundRole(), QColor(theme.MIDNIGHT))
-        self.setPalette(pal)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setBackgroundBrush(QBrush(QColor(theme.MIDNIGHT)))
+        self.setStyleSheet(
+            "QGraphicsView#PreviewCanvas { border: none; background: %s; }"
+            % theme.MIDNIGHT
+        )
+        self.setDragMode(QGraphicsView.NoDrag)
+        self.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+        self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
 
+        self._scene = QGraphicsScene(self)
+        self.setScene(self._scene)
+        self._item = None  # type: Optional[QGraphicsPixmapItem]
         self._pixmap = None  # type: Optional[QPixmap]
-        self._display = None  # type: Optional[QPixmap]
         self._fit = True
         self._zoom = 1.0
-        self._drawn_rect = (0, 0, 1, 1)
 
     def set_frame(self, pixmap: Optional[QPixmap]):
         self._pixmap = pixmap if pixmap is not None and not pixmap.isNull() else None
-        self._rescale()
+        self._scene.clear()
+        self._item = None
+        if self._pixmap is None:
+            self.resetTransform()
+            return
+        self._item = self._scene.addPixmap(self._pixmap)
+        self._item.setShapeMode(QGraphicsPixmapItem.BoundingRectShape)
+        self._scene.setSceneRect(self._item.boundingRect())
+        self._apply_view()
 
     def set_fit(self, fit: bool):
         self._fit = fit
-        self._rescale()
+        if fit:
+            self._zoom = 1.0
+        self._apply_view()
 
     def set_zoom(self, zoom: float):
         self._zoom = max(0.05, min(8.0, zoom))
         self._fit = False
-        self._rescale()
+        self._apply_view()
 
     def zoom(self) -> float:
         return self._zoom
@@ -683,29 +725,23 @@ class ImageCanvas(QWidget):
         return self._fit
 
     def has_frame(self) -> bool:
-        return self._display is not None and not self._display.isNull()
+        return self._pixmap is not None and not self._pixmap.isNull()
 
     def display_image(self) -> Optional[QImage]:
         if not self.has_frame():
             return None
-        return self._display.toImage()
+        # Tests sample viewer-adjusted pixels; return the source pixmap as an
+        # image (tone/channel already baked into what set_frame received).
+        return self._pixmap.toImage()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._fit:
-            self._rescale()
+            self._apply_view()
 
     def showEvent(self, event):
         super().showEvent(event)
-        self._rescale()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor(theme.MIDNIGHT))
-        if self._display is None or self._display.isNull():
-            return
-        x0, y0, w, h = self._drawn_rect
-        painter.drawPixmap(x0, y0, self._display)
+        self._apply_view()
 
     def leaveEvent(self, event):
         super().leaveEvent(event)
@@ -713,52 +749,25 @@ class ImageCanvas(QWidget):
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        self._on_mouse(event.position().toPoint())
-
-    def _rescale(self):
-        if self._pixmap is None or self._pixmap.isNull():
-            self._display = None
-            self.update()
+        if self._item is None or self._pixmap is None:
             return
-        if self._fit:
-            target = self.size()
-            if target.width() < 2 or target.height() < 2:
-                self._display = None
-                self.update()
-                return
-            self._display = self._pixmap.scaled(
-                target, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-        else:
-            self._display = self._pixmap.scaled(
-                self._pixmap.size() * self._zoom,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            )
-            self.setMinimumSize(self._display.size())
-            self.resize(self._display.size())
-        offset_x = max(0, (self.width() - self._display.width()) // 2)
-        offset_y = max(0, (self.height() - self._display.height()) // 2)
-        self._drawn_rect = (
-            offset_x,
-            offset_y,
-            max(1, self._display.width()),
-            max(1, self._display.height()),
-        )
-        self.update()
-
-    def _on_mouse(self, pos):
-        if self._pixmap is None or self._display is None or self._display.isNull():
-            return
-        x0, y0, w, h = self._drawn_rect
-        x = pos.x() - x0
-        y = pos.y() - y0
-        if not (0 <= x < w and 0 <= y < h):
+        scene_pos = self.mapToScene(event.position().toPoint())
+        x = int(scene_pos.x())
+        y = int(scene_pos.y())
+        if not (0 <= x < self._pixmap.width() and 0 <= y < self._pixmap.height()):
             self.probed.emit(-1, -1)
             return
-        source_x = int(x / w * self._pixmap.width())
-        source_y = int(y / h * self._pixmap.height())
-        self.probed.emit(source_x, source_y)
+        self.probed.emit(x, y)
+
+    def _apply_view(self):
+        if self._item is None:
+            return
+        if self._fit:
+            self.resetTransform()
+            self.fitInView(self._item, Qt.KeepAspectRatio)
+        else:
+            self.resetTransform()
+            self.scale(self._zoom, self._zoom)
 
 
 # ---------------------------------------------------------------------------
@@ -777,7 +786,15 @@ class PreviewWindow(QDialog):
         self.setWindowFlag(Qt.Window, True)
         self.setWindowTitle("Buffalo Review Drop — Preview")
         self.resize(QSize(1040, 760))
-        self.setStyleSheet(theme.APP_CSS)
+        # Do NOT apply theme.APP_CSS here. It styles every QLabel/QWidget and
+        # blanks image painting on Shotgun Desktop's macOS Qt build. Palette +
+        # per-control stylesheets only.
+        self.setStyleSheet(theme.PREVIEW_DIALOG_CSS)
+        pal = self.palette()
+        pal.setColor(self.backgroundRole(), QColor(theme.WHITE))
+        pal.setColor(self.foregroundRole(), QColor(theme.INK))
+        self.setPalette(pal)
+        self.setAutoFillBackground(True)
 
         self._tmpdir = Path(tempfile.mkdtemp(prefix="review_drop_preview_"))
         self._pool = QThreadPool()
@@ -809,12 +826,7 @@ class PreviewWindow(QDialog):
 
         self.canvas = ImageCanvas()
         self.canvas.probed.connect(self._on_probe)
-        self.scroll = QScrollArea()
-        self.scroll.setWidget(self.canvas)
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setAlignment(Qt.AlignCenter)
-        self.scroll.setStyleSheet(theme.PREVIEW_SCROLL_CSS)
-        layout.addWidget(self.scroll, 1)
+        layout.addWidget(self.canvas, 1)
 
         layout.addLayout(self._build_pipe_row())
         layout.addLayout(self._build_frame_row())
@@ -1038,6 +1050,14 @@ class PreviewWindow(QDialog):
             self.lbl_status.setText("Could not decode this frame: %s" % error)
             self.canvas.set_frame(None)
             return
+        # Load pixels on the GUI thread only.
+        if frame.pixmap().isNull():
+            self.lbl_status.setText(
+                "Decoded, but the image could not be displayed "
+                "(path: %s)." % (frame.display_path or frame.source)
+            )
+            self.canvas.set_frame(None)
+            return
         # Sequences can be thousands of frames; keep the scrub-back window
         # warm without holding every decoded frame in memory.
         if len(self._cache) > 48:
@@ -1081,7 +1101,6 @@ class PreviewWindow(QDialog):
 
     def _on_fit_toggled(self, checked: bool):
         self.canvas.set_fit(checked)
-        self.scroll.setWidgetResizable(checked)
 
     def _zoom_by(self, factor: float):
         self.btn_fit.setChecked(False)
@@ -1095,18 +1114,24 @@ class PreviewWindow(QDialog):
 
         channel = self.cmb_channel.currentText()
         exposure, gamma = self._exposure(), self._gamma()
+        # Always load the source pixmap on this (GUI) thread first.
+        pix = self._frame.pixmap()
+        if pix.isNull():
+            self.canvas.set_frame(None)
+            self.lbl_status.setText("Could not load decoded frame for display.")
+            return
+
         identity = (
             channel == "RGB"
             and abs(exposure) < 1e-6
             and abs(gamma - 1.0) < 1e-6
-            and not self._frame.image.hasAlphaChannel()
+            and not pix.hasAlpha()
         )
-        # Prefer reloading the PNG on the GUI thread (macOS-safe).
         if identity:
-            self.canvas.set_frame(self._frame.pixmap())
+            self.canvas.set_frame(pix)
             return
 
-        image = self._frame.image
+        image = pix.toImage()
         if channel != "RGB":
             image = _isolate_channel(image, channel)
         elif image.hasAlphaChannel():

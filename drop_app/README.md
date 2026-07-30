@@ -22,6 +22,25 @@ compact two-column layout.
 Accepted stills: `exr, hdr, png, jpg, jpeg, tif, tiff, tga, bmp, dpx, cin,
 gif, webp, psd, iff, sxr`. Drop one extension at a time (no mixed PNG+JPG).
 
+### Picking context
+
+Episode / Sequence / Shot (and Asset) are loaded whole from Flow at startup —
+the status log reports the counts — and filtered in the app. Picking an
+Episode narrows the Sequence list, but nothing is ever hidden: a Sequence
+with no Episode link, or a Shot with no Sequence link, still appears and is
+labelled `(no episode)` / `(no sequence)`, and clearing a level back to
+`— select —` shows everything again. The link fields are read from your
+Flow schema (`episode` or `sg_episode`, `sg_sequence` or `sequence`) rather
+than assumed.
+
+All four fields are type-ahead searchable and accept a code that isn't in
+the list. On submit the typed code is matched against what was loaded, then
+looked up live in Flow (so a shot created since launch is found), and only
+if it exists nowhere are you asked whether to create it. Created entities
+carry the project and the links above them — Sequence → Episode, Shot →
+Sequence, Asset → Type — and any field your site doesn't have is skipped
+with a warning rather than sent.
+
 ### Reference media and original sources
 
 Choose **Reference** as the Delivery type to copy stills or a QT straight

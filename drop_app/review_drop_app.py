@@ -67,6 +67,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QCompleter,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -107,6 +108,55 @@ def load_brand_font(default_size: int = 22) -> QFont:
         font.setBold(True)
     font.setLetterSpacing(QFont.PercentageSpacing, 108)
     return font
+
+
+PLACEHOLDER = "— select —"
+NO_EPISODE = "  (no episode)"
+NO_SEQUENCE = "  (no sequence)"
+
+BUTTON_CSS = """
+QPushButton {
+    background: #2f2f2f;
+    color: #e6e6e6;
+    border: 1px solid #4a4a4a;
+    border-radius: 10px;
+    padding: 6px 14px;
+}
+QPushButton:hover { background: #3a3a3a; border-color: #5f5f5f; }
+QPushButton:pressed { background: #262626; border-color: #6f6f6f; }
+QPushButton:disabled { background: #242424; color: #5a5a5a; border-color: #333; }
+"""
+
+
+def _searchable_combo() -> QComboBox:
+    """
+    Editable combo with contains-matching autocomplete.
+
+    Editable because a code the cascade filtered out — or one Flow hasn't got
+    yet — still has to be enterable. What gets typed is resolved against Flow
+    on submit rather than trusted on its own.
+    """
+    combo = QComboBox()
+    combo.setEditable(True)
+    combo.setInsertPolicy(QComboBox.NoInsert)
+    completer = combo.completer()
+    if completer:
+        completer.setCompletionMode(QCompleter.PopupCompletion)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+    return combo
+
+
+def entity_code(text: str) -> str:
+    """Drop the '(no sequence)' style annotation from a combo label."""
+    code = (text or "").split("  (")[0].strip()
+    return "" if code == PLACEHOLDER else code
+
+
+def _link_label(value) -> str:
+    if isinstance(value, dict):
+        return str(value.get("code") or value.get("id") or value)
+    return str(value)
 
 
 class DropZone(QLabel):
@@ -162,6 +212,9 @@ class ReviewDropWindow(QMainWindow):
         self._users = []
         self._record_pref = False
         self._preview_window = None
+        self._schema_fields = {}
+        self._seq_episode_field = None
+        self._shot_sequence_field = None
 
         root = QWidget()
         root.setStyleSheet("QWidget { background: #1e1e1e; color: #ddd; }")
@@ -207,11 +260,11 @@ class ReviewDropWindow(QMainWindow):
         shot_form = QFormLayout(self.shot_box)
         shot_form.setContentsMargins(8, 8, 8, 8)
         shot_form.setSpacing(6)
-        self.cmb_episode = QComboBox()
-        self.cmb_sequence = QComboBox()
-        self.cmb_shot = QComboBox()
-        self.cmb_episode.currentIndexChanged.connect(self._load_sequences)
-        self.cmb_sequence.currentIndexChanged.connect(self._load_shots)
+        self.cmb_episode = _searchable_combo()
+        self.cmb_sequence = _searchable_combo()
+        self.cmb_shot = _searchable_combo()
+        self.cmb_episode.currentIndexChanged.connect(self._refresh_sequences)
+        self.cmb_sequence.currentIndexChanged.connect(self._refresh_shots)
         shot_form.addRow("Episode", self.cmb_episode)
         shot_form.addRow("Sequence", self.cmb_sequence)
         shot_form.addRow("Shot", self.cmb_shot)
@@ -222,7 +275,7 @@ class ReviewDropWindow(QMainWindow):
         asset_form.setContentsMargins(8, 8, 8, 8)
         asset_form.setSpacing(6)
         self.cmb_asset_type = QComboBox()
-        self.cmb_asset = QComboBox()
+        self.cmb_asset = _searchable_combo()
         self.cmb_asset_type.currentIndexChanged.connect(self._load_assets)
         for t in ["Character", "Prop", "Environment", "Vehicle", "FX"]:
             self.cmb_asset_type.addItem(t)
@@ -313,6 +366,8 @@ class ReviewDropWindow(QMainWindow):
         btn_row.addWidget(self.btn_send, 3)
         btn_row.addWidget(self.btn_preview, 1)
         btn_row.addWidget(self.btn_ingest, 2)
+        for button in (self.btn_send, self.btn_preview, self.btn_ingest):
+            button.setStyleSheet(BUTTON_CSS)
         layout.addLayout(btn_row)
 
         self._update_modes()
@@ -323,7 +378,7 @@ class ReviewDropWindow(QMainWindow):
             self._log("Connected to Flow.")
             self._load_submitted_for()
             self._load_users()
-            self._load_episodes()
+            self._load_shot_context()
             self._load_assets()
         except Exception as exc:
             self._log("ERROR: could not connect to Flow: %s" % exc)
@@ -494,83 +549,133 @@ class ReviewDropWindow(QMainWindow):
             self.cmb_submitted_by.setCurrentIndex(default_idx)
         self._log("Loaded %d Flow user(s)." % len(self._users))
 
-    def _load_episodes(self):
+    def _project_filter(self):
+        return [["project", "is", {"type": "Project", "id": PROJECT_ID}]]
+
+    def _has_field(self, entity_type, field):
+        return bool(field) and self._schema_field(entity_type, [field]) == field
+
+    def _schema_field(self, entity_type, candidates):
+        """First of `candidates` this Flow site actually has on the entity."""
+        key = (entity_type, tuple(candidates))
+        if key in self._schema_fields:
+            return self._schema_fields[key]
+        try:
+            schema = self.sg.schema_field_read(entity_type)
+        except Exception as exc:
+            self._log("WARNING: could not read %s schema: %s" % (entity_type, exc))
+            schema = {}
+        field = next((c for c in candidates if c in schema), None)
+        if schema and not field:
+            self._log(
+                "WARNING: %s has none of %s — links will not be filtered."
+                % (entity_type, ", ".join(candidates))
+            )
+        self._schema_fields[key] = field
+        return field
+
+    def _find_all(self, entity_type, fields):
+        """Every record of a type on this project, ordered by code."""
+        try:
+            return self.sg.find(
+                entity_type,
+                self._project_filter(),
+                [f for f in fields if f],
+                order=[{"field_name": "code", "direction": "asc"}],
+            )
+        except Exception as exc:
+            self._log("WARNING: could not load %ss: %s" % (entity_type, exc))
+            return []
+
+    def _load_shot_context(self):
+        """
+        Pull the whole project once and filter the combos in memory.
+
+        Querying Sequence-by-Episode and Shot-by-Sequence hid anything whose
+        link was unset, so a real shot could be impossible to pick. Everything
+        is loaded here instead; the cascade narrows the lists but never drops
+        a record.
+        """
         if not self.sg:
             return
+        self._seq_episode_field = self._schema_field(
+            "Sequence", ["episode", "sg_episode"]
+        )
+        self._shot_sequence_field = self._schema_field(
+            "Shot", ["sg_sequence", "sequence"]
+        )
+        self._episodes = self._find_all("Episode", ["code"])
+        self._sequences = self._find_all(
+            "Sequence", ["code", self._seq_episode_field]
+        )
+        self._shots = self._find_all("Shot", ["code", self._shot_sequence_field])
+        self._log(
+            "Loaded %d episode(s), %d sequence(s), %d shot(s)."
+            % (len(self._episodes), len(self._sequences), len(self._shots))
+        )
+
         self.cmb_episode.blockSignals(True)
         self.cmb_episode.clear()
-        self._episodes = self.sg.find(
-            "Episode",
-            [["project", "is", {"type": "Project", "id": PROJECT_ID}]],
-            ["code"],
-            order=[{"field_name": "code", "direction": "asc"}],
-        )
-        self.cmb_episode.addItem("— select —", None)
+        self.cmb_episode.addItem(PLACEHOLDER, None)
         for ep in self._episodes:
             self.cmb_episode.addItem(ep["code"], ep)
         self.cmb_episode.blockSignals(False)
+        self._refresh_sequences()
 
-    def _load_sequences(self):
+    def _refresh_sequences(self, *_args):
+        """Sequences under the chosen Episode, or all of them if none is."""
         if not self.sg:
             return
+        episode = self.cmb_episode.currentData()
         self.cmb_sequence.blockSignals(True)
         self.cmb_sequence.clear()
-        self.cmb_shot.clear()
-        ep = self.cmb_episode.currentData()
-        if not ep:
-            self.cmb_sequence.blockSignals(False)
-            return
-        self._sequences = self.sg.find(
-            "Sequence",
-            [
-                ["project", "is", {"type": "Project", "id": PROJECT_ID}],
-                ["episode", "is", ep],
-            ],
-            ["code", "episode"],
-            order=[{"field_name": "code", "direction": "asc"}],
-        )
-        self.cmb_sequence.addItem("— select —", None)
+        self.cmb_sequence.addItem(PLACEHOLDER, None)
         for seq in self._sequences:
-            self.cmb_sequence.addItem(seq["code"], seq)
+            linked = seq.get(self._seq_episode_field) if self._seq_episode_field else None
+            if episode and linked and linked["id"] != episode["id"]:
+                continue
+            self.cmb_sequence.addItem(
+                seq["code"] + ("" if linked else NO_EPISODE), seq
+            )
         self.cmb_sequence.blockSignals(False)
+        self._refresh_shots()
 
-    def _load_shots(self):
+    def _refresh_shots(self, *_args):
+        """Shots under the chosen Sequence, or all of them if none is."""
         if not self.sg:
             return
+        sequence = self.cmb_sequence.currentData()
+        self.cmb_shot.blockSignals(True)
         self.cmb_shot.clear()
-        seq = self.cmb_sequence.currentData()
-        if not seq:
-            return
-        self._shots = self.sg.find(
-            "Shot",
-            [
-                ["project", "is", {"type": "Project", "id": PROJECT_ID}],
-                ["sg_sequence", "is", seq],
-            ],
-            ["code", "sg_sequence"],
-            order=[{"field_name": "code", "direction": "asc"}],
-        )
-        self.cmb_shot.addItem("— select —", None)
-        for sh in self._shots:
-            self.cmb_shot.addItem(sh["code"], sh)
+        self.cmb_shot.addItem(PLACEHOLDER, None)
+        for shot in self._shots:
+            linked = (
+                shot.get(self._shot_sequence_field)
+                if self._shot_sequence_field
+                else None
+            )
+            if sequence and linked and linked["id"] != sequence["id"]:
+                continue
+            self.cmb_shot.addItem(
+                shot["code"] + ("" if linked else NO_SEQUENCE), shot
+            )
+        self.cmb_shot.blockSignals(False)
 
-    def _load_assets(self):
+    def _load_assets(self, *_args):
         if not self.sg:
             return
-        self.cmb_asset.clear()
+        if not self._assets:
+            self._assets = self._find_all("Asset", ["code", "sg_asset_type"])
+            self._log("Loaded %d asset(s)." % len(self._assets))
         asset_type = self.cmb_asset_type.currentText()
-        self._assets = self.sg.find(
-            "Asset",
-            [
-                ["project", "is", {"type": "Project", "id": PROJECT_ID}],
-                ["sg_asset_type", "is", asset_type],
-            ],
-            ["code", "sg_asset_type"],
-            order=[{"field_name": "code", "direction": "asc"}],
-        )
-        self.cmb_asset.addItem("— select —", None)
-        for a in self._assets:
-            self.cmb_asset.addItem(a["code"], a)
+        self.cmb_asset.blockSignals(True)
+        self.cmb_asset.clear()
+        self.cmb_asset.addItem(PLACEHOLDER, None)
+        for asset in self._assets:
+            if asset_type and asset.get("sg_asset_type") not in (None, asset_type):
+                continue
+            self.cmb_asset.addItem(asset["code"], asset)
+        self.cmb_asset.blockSignals(False)
 
     def on_paths_dropped(self, paths):
         self.media = staging.classify_paths(paths)
@@ -676,11 +781,7 @@ class ReviewDropWindow(QMainWindow):
     def _gather_context(self):
         submitted_by = self._submitted_by_fields()
         if self.radio_shot.isChecked():
-            ep = self.cmb_episode.currentData()
-            seq = self.cmb_sequence.currentData()
-            shot = self.cmb_shot.currentData()
-            if not (ep and seq and shot):
-                raise ValueError("Select Episode, Sequence, and Shot.")
+            ep, seq, shot = self._shot_selection()
             return {
                 "entity_type": "Shot",
                 "entity": shot,
@@ -694,12 +795,9 @@ class ReviewDropWindow(QMainWindow):
                 "task_id": None,
                 **submitted_by,
             }
-        asset = self.cmb_asset.currentData()
-        if not asset:
-            raise ValueError("Select an Asset.")
         return {
             "entity_type": "Asset",
-            "entity": asset,
+            "entity": self._asset_selection(),
             "asset_type": self.cmb_asset_type.currentText(),
             "step": self.cmb_step.currentText().strip() or "turntable",
             "version": int(self.txt_version.text().strip() or "1"),
@@ -709,6 +807,128 @@ class ReviewDropWindow(QMainWindow):
             "task_id": None,
             **submitted_by,
         }
+
+    def _resolve_entity(self, combo, entity_type, pool, fields, links, label):
+        """
+        Turn what's in a context combo into a real Flow entity.
+
+        Picked from the list, matched against what was loaded, looked up live
+        in Flow (the lists go stale the moment someone adds a shot), and only
+        then offered as something to create — with the links the schema
+        actually has, so an override can't invent fields Flow doesn't carry.
+        """
+        code = entity_code(combo.currentText())
+        if not code:
+            return None
+        chosen = combo.currentData()
+        if chosen and (chosen.get("code") or "").lower() == code.lower():
+            return chosen
+        for entity in pool:
+            if (entity.get("code") or "").lower() == code.lower():
+                return entity
+
+        query_fields = [f for f in fields if f]
+        try:
+            found = self.sg.find_one(
+                entity_type,
+                self._project_filter() + [["code", "is", code]],
+                query_fields,
+            )
+        except Exception as exc:
+            raise ValueError("Could not look up %s '%s': %s" % (label, code, exc))
+        if found:
+            pool.append(found)
+            self._log("Resolved %s '%s' from Flow." % (label, code))
+            return found
+
+        created = self._create_entity(entity_type, code, links, query_fields, label)
+        # Kept in the pool rather than pushed into the combos: a repopulate
+        # here would wipe the codes still being typed into the row below.
+        pool.append(created)
+        return created
+
+    def _create_entity(self, entity_type, code, links, fields, label):
+        """Create a missing context entity, once the artist confirms it."""
+        schema_links = {}
+        for field, value in (links or {}).items():
+            if not field or not value:
+                continue
+            if not self._has_field(entity_type, field):
+                self._log(
+                    "WARNING: %s has no field '%s' on this site — not set."
+                    % (entity_type, field)
+                )
+                continue
+            schema_links[field] = value
+        detail = "\n".join(
+            "  %s: %s" % (field, _link_label(value))
+            for field, value in schema_links.items()
+        )
+        answer = QMessageBox.question(
+            self,
+            "Create %s in Flow?" % label,
+            "No %s named '%s' exists on this project.\n\n"
+            "Create it in Flow now?%s"
+            % (label, code, ("\n\n" + detail) if detail else ""),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            raise ValueError(
+                "%s '%s' does not exist in Flow — pick one from the list or "
+                "let it be created." % (label, code)
+            )
+        data = {
+            "project": {"type": "Project", "id": PROJECT_ID},
+            "code": code,
+        }
+        data.update(schema_links)
+        created = self.sg.create(entity_type, data)
+        created.setdefault("code", code)
+        self._log("Created %s '%s' in Flow (id %s)." % (label, code, created["id"]))
+        return created
+
+    def _shot_selection(self):
+        """Resolve Episode → Sequence → Shot, creating any that are missing."""
+        episode = self._resolve_entity(
+            self.cmb_episode, "Episode", self._episodes, ["code"], {}, "Episode"
+        )
+        if not episode:
+            raise ValueError("Select or type an Episode.")
+        sequence = self._resolve_entity(
+            self.cmb_sequence,
+            "Sequence",
+            self._sequences,
+            ["code", self._seq_episode_field],
+            {self._seq_episode_field: episode},
+            "Sequence",
+        )
+        if not sequence:
+            raise ValueError("Select or type a Sequence.")
+        shot = self._resolve_entity(
+            self.cmb_shot,
+            "Shot",
+            self._shots,
+            ["code", self._shot_sequence_field],
+            {self._shot_sequence_field: sequence},
+            "Shot",
+        )
+        if not shot:
+            raise ValueError("Select or type a Shot.")
+        return episode, sequence, shot
+
+    def _asset_selection(self):
+        asset = self._resolve_entity(
+            self.cmb_asset,
+            "Asset",
+            self._assets,
+            ["code", "sg_asset_type"],
+            {"sg_asset_type": self.cmb_asset_type.currentText()},
+            "Asset",
+        )
+        if not asset:
+            raise ValueError("Select or type an Asset.")
+        return asset
 
     def _record_fields(self):
         """Flow record metadata — only gathered when a record is requested."""
@@ -721,11 +941,7 @@ class ReviewDropWindow(QMainWindow):
 
     def _gather_reference_context(self):
         if self.radio_shot.isChecked():
-            ep = self.cmb_episode.currentData()
-            seq = self.cmb_sequence.currentData()
-            shot = self.cmb_shot.currentData()
-            if not (ep and seq and shot):
-                raise ValueError("Select Episode, Sequence, and Shot.")
+            ep, seq, shot = self._shot_selection()
             context = {
                 "entity_type": "Shot",
                 "entity": shot,
@@ -736,12 +952,9 @@ class ReviewDropWindow(QMainWindow):
                 "project_id": PROJECT_ID,
             }
         else:
-            asset = self.cmb_asset.currentData()
-            if not asset:
-                raise ValueError("Select an Asset.")
             context = {
                 "entity_type": "Asset",
-                "entity": asset,
+                "entity": self._asset_selection(),
                 "asset_type": self.cmb_asset_type.currentText(),
                 "step": "reference",
                 "version": 1,

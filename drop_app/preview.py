@@ -22,12 +22,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QObject, QRunnable, QSize, Qt, QThreadPool, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -89,6 +91,18 @@ QT_READABLE_EXTS = {
 LINEAR_EXTS = {".exr", ".hdr", ".sxr"}
 
 _TOOL_CACHE: dict = {}
+
+
+@dataclass
+class PipeOptions:
+    """Which stages of the show color pipe the preview applies."""
+
+    log_convert: bool = True   # ACEScg → LogC4
+    cdl: bool = True           # per-shot .cc
+    show_lut: bool = True      # show cube → Rec.709
+
+    def cache_key(self):
+        return (self.log_convert, self.cdl, self.show_lut)
 
 
 def find_tool(configured: str, name: str) -> Optional[str]:
@@ -184,12 +198,13 @@ class FrameSource:
 class StillSource(FrameSource):
     """Single images and image sequences, linear or display-referred."""
 
-    def __init__(self, files, frame_first, linear, tmpdir, cdl_path=None):
+    def __init__(self, files, frame_first, linear, tmpdir, cdl_path=None, pipe=None):
         super().__init__(tmpdir)
         self.files = sorted(files, key=lambda p: p.name)
         self.frame_first = frame_first
         self.linear = linear
         self.cdl_path = cdl_path
+        self.pipe = pipe or PipeOptions()
 
     def count(self):
         return len(self.files)
@@ -206,14 +221,23 @@ class StillSource(FrameSource):
     def decode(self, index):
         src = self.files[index]
         ext = src.suffix.lower()
+        pipe = self.pipe
 
+        # Display-referred: Qt can decode these; the show pipe does not apply.
         if not self.linear and ext in QT_READABLE_EXTS:
             image = QImage(str(src))
             if not image.isNull():
                 return DecodedFrame(image, "as delivered (display-referred)", "Qt", src)
 
-        dst = self.tmpdir / ("frame_%04d.png" % index)
-        pipeline, tool = _convert_still(src, dst, self.linear, self.cdl_path)
+        # Include pipe state in the temp name so toggling stages can't
+        # accidentally reuse a previous bake sitting on disk.
+        tag = "%d%d%d" % (
+            1 if pipe.log_convert else 0,
+            1 if pipe.cdl else 0,
+            1 if pipe.show_lut else 0,
+        )
+        dst = self.tmpdir / ("frame_%s_%04d.png" % (tag, index))
+        pipeline, tool = _convert_still(src, dst, self.linear, self.cdl_path, pipe)
         image = QImage(str(dst))
         if image.isNull():
             raise RuntimeError("decoded frame could not be read back")
@@ -345,10 +369,16 @@ class NoPreviewSource(FrameSource):
         return self.reason
 
 
-def source_for_media(media: dict, tmpdir: Path, cdl_path=None) -> FrameSource:
+def source_for_media(
+    media: dict,
+    tmpdir: Path,
+    cdl_path=None,
+    pipe: Optional[PipeOptions] = None,
+) -> FrameSource:
     """Build the right FrameSource for a classify_paths() result."""
     media_type = (media or {}).get("media_type")
     files = [Path(f) for f in (media or {}).get("files", [])]
+    pipe = pipe or PipeOptions()
 
     if media_type == "movie":
         return MovieSource(Path(media["movie_path"]), tmpdir)
@@ -360,6 +390,7 @@ def source_for_media(media: dict, tmpdir: Path, cdl_path=None) -> FrameSource:
             linear,
             tmpdir,
             cdl_path if linear else None,
+            pipe,
         )
     if media_type == "model_3d":
         return NoPreviewSource(
@@ -371,7 +402,13 @@ def source_for_media(media: dict, tmpdir: Path, cdl_path=None) -> FrameSource:
     return NoPreviewSource(files, "Nothing loaded to preview.", tmpdir)
 
 
-def _convert_still(src: Path, dst: Path, linear: bool, cdl_path) -> tuple:
+def _convert_still(
+    src: Path,
+    dst: Path,
+    linear: bool,
+    cdl_path,
+    pipe: Optional[PipeOptions] = None,
+) -> tuple:
     """
     Decode any still to an 8-bit PNG; returns (pipeline label, tool).
 
@@ -380,10 +417,11 @@ def _convert_still(src: Path, dst: Path, linear: bool, cdl_path) -> tuple:
     since an OCIO config or LUT problem shouldn't leave the artist with no
     picture at all.
     """
+    pipe = pipe or PipeOptions()
     errors = []
     for decoder in (_oiiotool_still, _ffmpeg_still):
         try:
-            result = decoder(src, dst, linear, cdl_path)
+            result = decoder(src, dst, linear, cdl_path, pipe)
         except Exception as exc:
             errors.append(str(exc))
             continue
@@ -396,7 +434,7 @@ def _convert_still(src: Path, dst: Path, linear: bool, cdl_path) -> tuple:
     )
 
 
-def _oiiotool_still(src: Path, dst: Path, linear: bool, cdl_path):
+def _oiiotool_still(src: Path, dst: Path, linear: bool, cdl_path, pipe: PipeOptions):
     oiiotool = find_tool(OIIOTOOL, "oiiotool")
     if not oiiotool:
         return None
@@ -404,32 +442,73 @@ def _oiiotool_still(src: Path, dst: Path, linear: bool, cdl_path):
         _run([oiiotool, str(src), "-d", "uint8", "-o", str(dst)])
         return "as delivered (display-referred)", "oiiotool"
 
+    apply_log = pipe.log_convert
+    apply_cdl = bool(pipe.cdl and cdl_path and os.path.exists(cdl_path))
+    apply_lut = pipe.show_lut and os.path.exists(SHOW_LUT_PATH)
+    use_display = pipe.show_lut and not apply_lut
+
+    # Nothing from the show pipe: clamp scene-linear to 8-bit so the frame
+    # is at least visible (usually crushed — that's the point of turning it
+    # all off to inspect).
+    if not apply_log and not apply_cdl and not apply_lut and not use_display:
+        _run([
+            oiiotool, str(src),
+            "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", str(dst),
+        ])
+        return "raw ACEScg clamp (approx — color pipe off)", "oiiotool"
+
     cmd = [oiiotool, "--colorconfig", OCIO_CONFIG, str(src)]
-    cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
-    steps = ["ACEScg", "LogC4"]
-    if cdl_path and os.path.exists(cdl_path):
+    steps = []
+    approx = False
+
+    if apply_log:
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
+        steps.extend(["ACEScg", "LogC4"])
+    else:
+        steps.append("ACEScg")
+        approx = True
+
+    if apply_cdl:
         cmd += ["--ociofiletransform", cdl_path]
         steps.append("CDL")
-    if os.path.exists(SHOW_LUT_PATH):
+        if not apply_log:
+            approx = True
+
+    if apply_lut:
         cmd += ["--ociofiletransform", SHOW_LUT_PATH]
         steps.append("show LUT")
-        label = " → ".join(steps + ["Rec.709"])
+        if not apply_log:
+            approx = True
+    elif use_display:
+        if apply_log:
+            cmd += [
+                "--ociodisplay:from=%s" % OCIO_LOGC4,
+                OCIO_REC709_DISPLAY,
+                OCIO_REC709_VIEW,
+            ]
+            steps.append("Rec.709 display")
+            approx = True
+        else:
+            # Display transform expects LogC4; without the convert, just clamp.
+            steps.append("clamp")
+            approx = True
     else:
-        cmd += [
-            "--ociodisplay:from=%s" % OCIO_LOGC4,
-            OCIO_REC709_DISPLAY,
-            OCIO_REC709_VIEW,
-        ]
-        label = (
-            "%s → Rec.709 display transform (approx — show LUT not found, "
-            "delivery will differ)" % " → ".join(steps)
-        )
+        # Pipe stages before the LUT only — inspect LogC4 / ACEScg directly.
+        steps.append("no LUT")
+        approx = True
+
     cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", str(dst)]
     _run(cmd)
+    label = " → ".join(steps)
+    if apply_lut or (use_display and apply_log):
+        if "Rec.709" not in label and apply_lut:
+            label = "%s → Rec.709" % label
+    if approx:
+        label = "%s (approx — not the delivered look)" % label
     return label, "oiiotool"
 
 
-def _ffmpeg_still(src: Path, dst: Path, linear: bool, cdl_path):
+def _ffmpeg_still(src: Path, dst: Path, linear: bool, cdl_path, pipe: PipeOptions):
     ffmpeg = find_tool(FFMPEG, "ffmpeg")
     if not ffmpeg:
         return None
@@ -536,19 +615,23 @@ def _isolate_channel(image: QImage, channel: str) -> QImage:
     return gray.copy()
 
 
-class ImageCanvas(QLabel):
-    """Shows the current frame, fit to the window or at a fixed zoom."""
+class ImageCanvas(QWidget):
+    """
+    Shows the current frame, fit to the window or at a fixed zoom.
+
+    Painted manually — a QLabel with a stylesheet background swallows its
+    pixmap on several Qt/macOS builds, which is why the preview came up black.
+    """
 
     probed = Signal(int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAlignment(Qt.AlignCenter)
         self.setMouseTracking(True)
         self.setMinimumSize(320, 240)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.setStyleSheet(theme.PREVIEW_CANVAS_CSS)
         self._pixmap = None
+        self._display = None
         self._fit = True
         self._zoom = 1.0
         self._drawn_rect = (0, 0, 1, 1)
@@ -572,36 +655,63 @@ class ImageCanvas(QLabel):
     def is_fit(self) -> bool:
         return self._fit
 
+    def has_frame(self) -> bool:
+        return self._display is not None and not self._display.isNull()
+
+    def display_image(self) -> Optional[QImage]:
+        if not self.has_frame():
+            return None
+        return self._display.toImage()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._fit:
             self._rescale()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Layout often settles only after the first show — rescale then.
+        if self._fit:
+            self._rescale()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor(theme.MIDNIGHT))
+        if self._display is None or self._display.isNull():
+            return
+        x0, y0, w, h = self._drawn_rect
+        painter.drawPixmap(x0, y0, self._display)
+
     def _rescale(self):
-        if self._pixmap is None:
-            self.clear()
+        if self._pixmap is None or self._pixmap.isNull():
+            self._display = None
+            self.update()
             return
         if self._fit:
-            # Drop any minimum left over from a zoom, or the scroll area
-            # can never shrink the canvas back down.
             self.setMinimumSize(320, 240)
-            scaled = self._pixmap.scaled(
-                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            target = self.size()
+            if target.width() < 2 or target.height() < 2:
+                self._display = None
+                self.update()
+                return
+            self._display = self._pixmap.scaled(
+                target, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         else:
-            scaled = self._pixmap.scaled(
+            self._display = self._pixmap.scaled(
                 self._pixmap.size() * self._zoom,
                 Qt.KeepAspectRatio,
                 Qt.SmoothTransformation,
             )
-            self.setMinimumSize(scaled.size())
-            self.resize(scaled.size())
-        offset_x = max(0, (self.width() - scaled.width()) // 2)
-        offset_y = max(0, (self.height() - scaled.height()) // 2)
+            self.setMinimumSize(self._display.size())
+            self.resize(self._display.size())
+        offset_x = max(0, (self.width() - self._display.width()) // 2)
+        offset_y = max(0, (self.height() - self._display.height()) // 2)
         self._drawn_rect = (
-            offset_x, offset_y, max(1, scaled.width()), max(1, scaled.height())
+            offset_x, offset_y,
+            max(1, self._display.width()), max(1, self._display.height()),
         )
-        super().setPixmap(scaled)
+        self.update()
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -649,6 +759,9 @@ class PreviewWindow(QDialog):
         self._source = None
         self._frame = None
         self._adjusted_buffer = None
+        self._media = None
+        self._cdl_path = None
+        self._pipe = PipeOptions()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -673,6 +786,7 @@ class PreviewWindow(QDialog):
         self.scroll.setStyleSheet(theme.PREVIEW_SCROLL_CSS)
         layout.addWidget(self.scroll, 1)
 
+        layout.addLayout(self._build_pipe_row())
         layout.addLayout(self._build_frame_row())
         layout.addLayout(self._build_view_row())
 
@@ -681,6 +795,33 @@ class PreviewWindow(QDialog):
         layout.addWidget(self.lbl_status)
 
     # -- construction helpers ------------------------------------------------
+
+    def _build_pipe_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        title = QLabel("Color pipe")
+        title.setStyleSheet(LABEL_CSS)
+        row.addWidget(title)
+
+        self.chk_log = QCheckBox("ACEScg → LogC4")
+        self.chk_log.setChecked(True)
+        self.chk_log.setToolTip("Scene-linear to LogC4 convert (first stage of the bake).")
+        self.chk_cdl = QCheckBox("CDL")
+        self.chk_cdl.setChecked(True)
+        self.chk_cdl.setToolTip("Per-shot .cc from plates/, when one exists.")
+        self.chk_lut = QCheckBox("Show LUT")
+        self.chk_lut.setChecked(True)
+        self.chk_lut.setToolTip("Show cube → Rec.709. Off leaves LogC4 / ACEScg for inspection.")
+
+        for box in (self.chk_log, self.chk_cdl, self.chk_lut):
+            box.toggled.connect(self._on_pipe_toggled)
+            row.addWidget(box)
+
+        row.addStretch()
+        self.lbl_pipe_hint = QLabel("")
+        self.lbl_pipe_hint.setStyleSheet(LABEL_CSS)
+        row.addWidget(self.lbl_pipe_hint)
+        return row
 
     def _build_frame_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -773,11 +914,15 @@ class PreviewWindow(QDialog):
 
     def set_media(self, media: dict, cdl_path: Optional[str] = None):
         """Point the viewer at a fresh classify_paths() result."""
+        self._media = media
+        self._cdl_path = cdl_path
         self._cache.clear()
         self._frame = None
         self.canvas.set_frame(None)
         self._request_id += 1
-        self._source = source_for_media(media, self._tmpdir, cdl_path)
+        self._pipe = self._pipe_from_ui()
+        self._source = source_for_media(media, self._tmpdir, cdl_path, self._pipe)
+        self._sync_pipe_controls()
 
         count = self._source.count()
         self.sld_frame.blockSignals(True)
@@ -800,6 +945,39 @@ class PreviewWindow(QDialog):
             self.lbl_status.setText(reason or "Nothing to preview.")
             return
         self._show_frame(0)
+
+    def _pipe_from_ui(self) -> PipeOptions:
+        return PipeOptions(
+            log_convert=self.chk_log.isChecked(),
+            cdl=self.chk_cdl.isChecked(),
+            show_lut=self.chk_lut.isChecked(),
+        )
+
+    def _sync_pipe_controls(self):
+        """Enable pipe toggles only for scene-linear stills."""
+        linear = isinstance(self._source, StillSource) and self._source.linear
+        has_cdl = bool(
+            linear and self._cdl_path and os.path.exists(self._cdl_path)
+        )
+        for box in (self.chk_log, self.chk_lut):
+            box.setEnabled(linear)
+        self.chk_cdl.setEnabled(linear and has_cdl)
+        if not linear:
+            self.lbl_pipe_hint.setText("Pipe applies to EXR / HDR only.")
+        elif not has_cdl:
+            self.lbl_pipe_hint.setText("No shot CDL on disk.")
+        else:
+            self.lbl_pipe_hint.setText(os.path.basename(self._cdl_path))
+
+    def _on_pipe_toggled(self, *_args):
+        if not isinstance(self._source, StillSource) or not self._source.linear:
+            return
+        self._pipe = self._pipe_from_ui()
+        self._source.pipe = self._pipe
+        self._cache.clear()
+        self._frame = None
+        index = self.sld_frame.value()
+        self._show_frame(index)
 
     # -- frame handling ------------------------------------------------------
 

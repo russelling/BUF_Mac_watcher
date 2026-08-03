@@ -27,6 +27,16 @@ Burn-ins on every frame:
                    "{script}_{real}_{variant}_{step}_v{version}"
     Bottom center: source frame number
     Bottom right:  source timecode (HH:MM:SS:FF), anchored to start_timecode
+                   Directly above it: two small status dots reporting
+                   whether the per-shot CDL and the show LUT were actually
+                   found and applied for this bake.
+                     green  - stage found on disk and applied
+                     yellow - stage intentionally disabled (color_pipe flag)
+                     red    - stage expected but NOT found (ungraded /
+                              un-LUT'd - this QT does not reflect final look)
+                   The CDL dot is omitted on asset turntables (no per-shot
+                   CDL concept there). Both dots are omitted on skip_color /
+                   movie-passthrough bakes (no OCIO pipe runs at all).
 
 Requires:
     brew install ffmpeg openimageio
@@ -102,6 +112,28 @@ FPS = 24
 # pillarboxed to exactly this, regardless of source resolution or squeeze.
 DELIVERY_WIDTH = 1920
 DELIVERY_HEIGHT = 1080
+
+# ---------------------------------------------------------------------------
+# CDL / Show LUT status dots (burn-in, next to the bottom-right timecode)
+# ---------------------------------------------------------------------------
+# Small filled squares (not circles - avoids depending on a font that has a
+# glyph for one) stacked in a single row, right-aligned to the same margin
+# as the timecode, directly above it. Deliberately subtle: ~8px, muted
+# colors, a thin dark outline so they read against any footage without
+# shouting over the shot. Positions are computed from the fixed
+# DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to that size) rather than
+# ffmpeg's runtime w/h expressions, since dot size never changes per-frame.
+STATUS_DOT_SIZE = 8
+STATUS_DOT_GAP = 5          # horizontal gap between the two dots
+STATUS_DOT_Y_GAP = 10       # vertical gap between the dot row and the TC row
+STATUS_COLOR_OK = "0x33CC33"     # green  - found on disk and applied
+STATUS_COLOR_WARN = "0xE6C229"   # yellow - intentionally off (color_pipe flag)
+STATUS_COLOR_BAD = "0xD93025"    # red    - expected but not found on disk
+STATUS_DOT_COLORS = {
+    "ok": STATUS_COLOR_OK,
+    "warn": STATUS_COLOR_WARN,
+    "bad": STATUS_COLOR_BAD,
+}
 
 # ---------------------------------------------------------------------------
 # Slate title + thumbnails + bottom strip
@@ -334,6 +366,50 @@ def is_shot_context(data):
     return data.get("type", "shot") != "asset_turntable"
 
 
+def compute_indicator_statuses(data, skip_color, cdl_path, apply_cdl_stage,
+                                want_show_lut, lut_file_found):
+    """
+    Work out the two burn-in status-dot states for this bake.
+
+    Returns (cdl_status, lut_status). Each is one of:
+      None    - dot omitted entirely. Asset turntables have no per-shot CDL
+                concept (cdl_status only). skip_color / movie-passthrough
+                bakes run no OCIO pipe at all (both statuses).
+      "ok"    - stage found on disk and applied.
+      "warn"  - stage intentionally turned off via the color_pipe flag. Not
+                a bug, but worth flagging so an intentional preview isn't
+                mistaken for a finaled grade.
+      "bad"   - stage was expected/requested but the file could not be
+                found on disk (ungraded CDL, or Show LUT missing and
+                falling back to a generic display transform).
+
+    Deliberately keyed off apply_cdl_stage/want_show_lut/lut_file_found
+    directly rather than re-deriving from bake_frame's internal fallback
+    logic, so this stays correct even if that logic changes.
+    """
+    if skip_color:
+        return None, None
+
+    if is_shot_context(data):
+        if not apply_cdl_stage:
+            cdl_status = "warn"
+        elif cdl_path:
+            cdl_status = "ok"
+        else:
+            cdl_status = "bad"
+    else:
+        cdl_status = None  # assets have no per-shot CDL concept
+
+    if not want_show_lut:
+        lut_status = "warn"
+    elif lut_file_found:
+        lut_status = "ok"
+    else:
+        lut_status = "bad"
+
+    return cdl_status, lut_status
+
+
 # ---------------------------------------------------------------------------
 # Color bake: single EXR frame -> baked PNG (for slate) or baked EXR (frames)
 # ---------------------------------------------------------------------------
@@ -513,7 +589,8 @@ def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size):
 # Burn-ins: overlay text onto frames using FFmpeg drawtext
 # ---------------------------------------------------------------------------
 
-def build_drawtext_filters(data, frame_offset, start_tc):
+def build_drawtext_filters(data, frame_offset, start_tc,
+                            cdl_status=None, lut_status=None):
     """
     Build FFmpeg drawtext filter chain for burn-ins.
 
@@ -523,6 +600,11 @@ def build_drawtext_filters(data, frame_offset, start_tc):
                    burn-in. Already offset by the caller to account for the
                    prepended slate, so it reads correctly on the first image
                    frame.
+    cdl_status,
+    lut_status   : "ok" / "warn" / "bad" / None - see
+                   compute_indicator_statuses(). Rendered as small status
+                   dots directly above the timecode burn-in; None omits the
+                   corresponding dot entirely.
     """
     is_shot = is_shot_context(data)
 
@@ -601,6 +683,37 @@ def build_drawtext_filters(data, frame_offset, start_tc):
         ":fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
         % (tc_esc, FPS, margin, margin, font_size)
     )
+
+    # CDL / Show LUT status dots: a subtle row of small colored squares
+    # right-aligned to the same margin as the timecode, directly above it.
+    # Fixed pixel math off DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to
+    # that size) rather than ffmpeg's dynamic tw/th, since the dots are a
+    # constant size regardless of what text renders alongside them.
+    # Order is pipeline order [cdl, lut], rendered right-to-left so the LUT
+    # dot (or whichever one remains, on asset turntables) sits closest to
+    # the timecode/margin.
+    active_dots = [s for s in (cdl_status, lut_status) if s is not None]
+    if active_dots:
+        dot_row_bottom_y = DELIVERY_HEIGHT - margin - font_size - STATUS_DOT_Y_GAP
+        dot_row_top_y = dot_row_bottom_y - STATUS_DOT_SIZE
+        n = len(active_dots)
+        for idx, status in enumerate(active_dots):
+            slot_from_right = n - 1 - idx
+            dot_x = (
+                DELIVERY_WIDTH - margin - STATUS_DOT_SIZE
+                - slot_from_right * (STATUS_DOT_SIZE + STATUS_DOT_GAP)
+            )
+            color = STATUS_DOT_COLORS[status]
+            # 1px dark outline behind each dot so it stays legible against
+            # any footage color (including footage close to the dot color).
+            filters.append(
+                "drawbox=x=%d:y=%d:w=%d:h=%d:color=black@0.6:t=fill"
+                % (dot_x - 1, dot_row_top_y - 1, STATUS_DOT_SIZE + 2, STATUS_DOT_SIZE + 2)
+            )
+            filters.append(
+                "drawbox=x=%d:y=%d:w=%d:h=%d:color=%s:t=fill"
+                % (dot_x, dot_row_top_y, STATUS_DOT_SIZE, STATUS_DOT_SIZE, color)
+            )
 
     return ",".join(filters)
 
@@ -911,6 +1024,10 @@ def bake_sequence(data, output_paths):
         # Keep want_show_lut so bake_frame can use the display fallback.
         use_show_lut = want_show_lut
 
+    # Independent of the display-fallback bookkeeping above: did the actual
+    # LUT file exist on disk? This is what the status dot reports.
+    lut_file_found = (not skip_color) and os.path.exists(SHOW_LUT_PATH)
+
     if not apply_log:
         print("[qt_bake_oiio] LogC4 convert: skipped (color_pipe.log_convert=false)")
 
@@ -1009,7 +1126,13 @@ def bake_sequence(data, output_paths):
             burnin_offset = first
             burnin_start_tc = start_tc
 
-        burnin_filters = build_drawtext_filters(data, burnin_offset, burnin_start_tc)
+        cdl_status, lut_status = compute_indicator_statuses(
+            data, skip_color, cdl_path, apply_cdl_stage, want_show_lut, lut_file_found,
+        )
+        burnin_filters = build_drawtext_filters(
+            data, burnin_offset, burnin_start_tc,
+            cdl_status=cdl_status, lut_status=lut_status,
+        )
         embed_tc = burnin_start_tc
 
         # ── 4+5. Encode to ProRes QT with burn-ins and TC track ───────────────

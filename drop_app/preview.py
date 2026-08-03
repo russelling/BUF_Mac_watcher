@@ -100,7 +100,7 @@ class PipeOptions:
     """Which stages of the show color pipe the preview applies."""
 
     log_convert: bool = True   # ACEScg → LogC4
-    cdl: bool = True           # per-shot .cc
+    cdl: bool = True           # per-shot .cdl / legacy .cc
     show_lut: bool = True      # show cube → Rec.709
 
     def cache_key(self):
@@ -213,13 +213,17 @@ def tools_search_report() -> str:
 
 
 def shot_cdl_path(episode: str, sequence: str, shot: str) -> Optional[str]:
-    """The per-shot .cc the bake would apply, if it exists on disk."""
+    """Primary shot CDL: plates/{Shot}_BG1.cdl (legacy .cdl / .cc accepted)."""
     if not (episode and sequence and shot):
         return None
-    candidate = os.path.join(
-        SHOTS_ROOT, str(episode), str(sequence), str(shot), "plates", "%s.cc" % shot
+    plates_dir = os.path.join(
+        SHOTS_ROOT, str(episode), str(sequence), str(shot), "plates"
     )
-    return candidate if os.path.exists(candidate) else None
+    for name in ("%s_BG1.cdl" % shot, "%s.cdl" % shot, "%s.cc" % shot):
+        candidate = os.path.join(plates_dir, name)
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
 
 def _run(cmd) -> None:
@@ -1003,7 +1007,7 @@ class PreviewWindow(QDialog):
         self.chk_cdl.setCheckable(True)
         self.chk_cdl.setChecked(True)
         self.chk_cdl.setToolTip(
-            "Per-shot .cc from plates/, when one exists. Off skips CDL on Send too."
+            "Per-shot {Shot}_BG1.cdl from plates/, when one exists. Off skips CDL on Send too."
         )
         self.chk_lut = QPushButton("Show LUT")
         self.chk_lut.setCheckable(True)

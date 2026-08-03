@@ -62,7 +62,7 @@ loaded, so visibility and color can be checked before anything is sent.
 
 Scene-linear stills are decoded through the same chain the QT Watcher bakes
 with — ACEScg → LogC4 → CDL → show LUT → Rec.709 — so the preview is the
-delivered look, CDL included when the selected Shot has a `.cc` in `plates/`.
+delivered look, CDL included when the selected Shot has a `{Shot}_BG1.cdl` in `plates/`.
 Display-referred stills and movies are shown as delivered, matching the
 watcher's `skip_color` path.
 

@@ -123,17 +123,23 @@ def build_color_bake(read_node, data):
 
     last = cs1
 
-    # CDL: shots only — look for a per-shot .cc file
+    # CDL: shots only — primary is plates/{Shot}_BG1.cdl; legacy {Shot}.cc still accepted.
     if is_shot_context(data):
         shot    = data.get("shot_code", "")
         episode = str(data.get("episode", ""))
         # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
         mid = str(data.get("sequence") or data.get("scene") or "")
-        cdl_path = os.path.join(
+        plates_dir = os.path.join(
             "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots",
-            episode, mid, shot, "plates", "%s.cc" % shot,
+            episode, mid, shot, "plates",
         )
-        if os.path.exists(cdl_path):
+        cdl_candidates = [
+            os.path.join(plates_dir, "%s_BG1.cdl" % shot),
+            os.path.join(plates_dir, "%s.cdl" % shot),
+            os.path.join(plates_dir, "%s.cc" % shot),
+        ]
+        cdl_path = next((p_ for p_ in cdl_candidates if os.path.exists(p_)), None)
+        if cdl_path:
             cdl = nuke.createNode("OCIOFileTransform", inpanel=False)
             cdl.setInput(0, last)
             cdl["file"].setValue(p(cdl_path))

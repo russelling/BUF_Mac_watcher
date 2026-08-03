@@ -9169,3 +9169,517 @@ RuntimeError: No frames were baked — check EXR path: /Volumes/atv-post-lucid3/
 
 [2026-07-15 12:50:52] Uploaded Version 76920 (s112_Stairway_Set_turntable_turntable_v001)
 [2026-07-15 12:50:52] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/assets/Environment/s112_Stairway_Set/render/work/s112_Stairway_Set_turntable_v001/.render_complete_s112_Stairway_Set_turntable_v001.json
+[2026-07-30 14:51:43] Found 1 flag(s)
+[2026-07-30 14:51:44] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[2026-07-30 14:51:44] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/review/301_999_010_temp_v099.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_999_010_temp_v099.mov
+[2026-07-30 14:51:54] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[qt_bake_oiio] Start TC: 00:00:41:21 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/plates/301_999_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_418vq_zc
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1005.exr
+[qt_bake_oiio] Thumbnail bake: 301_999_010_temp_v099.1005.exr
+[qt_bake_oiio] Thumbnail bake: 301_999_010_temp_v099.1005.exr
+[qt_bake_oiio] Thumbnail bake: 301_999_010_temp_v099.1005.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_999_010_temp_v099.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/review/301_999_010_temp_v099.mov
+[qt_bake_oiio] Encode QT: 301_999_010_temp_v099.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_999_010_temp_v099.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 14:51:56] Uploaded Version 77214 (301_999_010_temp_v099)
+[2026-07-30 14:51:56] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[2026-07-30 14:52:48] Found 1 flag(s)
+[2026-07-30 14:52:48] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[2026-07-30 14:52:48] ERROR processing /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json: Expecting value: line 1 column 1 (char 0)
+[2026-07-30 14:53:40] Found 1 flag(s)
+[2026-07-30 14:53:40] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[2026-07-30 14:53:40] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/review/301_999_010_temp_v099.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_999_010_temp_v099.mov
+[2026-07-30 14:54:06] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[qt_bake_oiio] Start TC: 00:00:41:17 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/plates/301_999_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_2t97zlqg
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1001.exr
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1002.exr
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1003.exr
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1004.exr
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1005.exr
+[qt_bake_oiio] Color bake: 301_999_010_temp_v099.1006.exr
+[qt_bake_oiio] Thumbnail bake: 301_999_010_temp_v099.1001.exr
+[qt_bake_oiio] Thumbnail bake: 301_999_010_temp_v099.1003.exr
+[qt_bake_oiio] Thumbnail bake: 301_999_010_temp_v099.1006.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_999_010_temp_v099.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/review/301_999_010_temp_v099.mov
+[qt_bake_oiio] Encode QT: 301_999_010_temp_v099.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_999_010_temp_v099.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 14:54:08] Uploaded Version 77215 (301_999_010_temp_v099)
+[2026-07-30 14:54:08] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/tests/301_999/301_999_010/render/work/301_999_010_temp_v099/.render_complete_301_999_010_temp_v099.json
+[2026-07-30 15:10:28] Found 1 flag(s)
+[2026-07-30 15:10:28] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v105/.render_complete_301_019_010_temp_v105.json
+[2026-07-30 15:10:28] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v105/.render_complete_301_019_010_temp_v105.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v105.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_010_temp_v105.mov
+[2026-07-30 15:10:36] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v105/.render_complete_301_019_010_temp_v105.json
+[qt_bake_oiio] Start TC: 00:00:00:17 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=False color_pipe={log_convert=True, cdl=True, show_lut=True}
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/plates/301_019_010.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_iyh9k34w
+[qt_bake_oiio] Color bake: 301_019_010_temp_v105.0017.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v105.0017.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v105.0017.exr
+[qt_bake_oiio] Thumbnail bake: 301_019_010_temp_v105.0017.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v105.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v105.mov
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v105.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_010_temp_v105.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 15:10:37] Uploaded Version 77216 (301_019_010_temp_v105)
+[2026-07-30 15:10:37] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v105/.render_complete_301_019_010_temp_v105.json
+[2026-07-30 15:12:21] Found 1 flag(s)
+[2026-07-30 15:12:21] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v106/.render_complete_301_019_010_temp_v106.json
+[2026-07-30 15:12:21] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v106/.render_complete_301_019_010_temp_v106.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v106.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_010_temp_v106.mov
+[2026-07-30 15:12:26] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v106/.render_complete_301_019_010_temp_v106.json
+[qt_bake_oiio] Start TC: 00:00:00:09 (source: frame-derived)
+[qt_bake_oiio] include_slate=True skip_color=True color_pipe={log_convert=False, cdl=False, show_lut=False}
+[qt_bake_oiio] CDL/LUT: skipped (skip_color)
+[qt_bake_oiio] LogC4 convert: skipped (color_pipe.log_convert=false)
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_aswxio_f
+[qt_bake_oiio] Passthrough: 301_019_010_temp_v106.0009.png
+[qt_bake_oiio] Thumbnail passthrough: 301_019_010_temp_v106.0009.png
+[qt_bake_oiio] Thumbnail passthrough: 301_019_010_temp_v106.0009.png
+[qt_bake_oiio] Thumbnail passthrough: 301_019_010_temp_v106.0009.png
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v106.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/review/301_019_010_temp_v106.mov
+[qt_bake_oiio] Encode QT: 301_019_010_temp_v106.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_010_temp_v106.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 15:12:28] Uploaded Version 77217 (301_019_010_temp_v106)
+[2026-07-30 15:12:28] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_010/render/work/301_019_010_temp_v106/.render_complete_301_019_010_temp_v106.json
+[2026-07-30 16:04:06] Found 1 flag(s)
+[2026-07-30 16:04:06] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v011/.render_complete_301_019_011_temp_v011.json
+[2026-07-30 16:04:07] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v011/.render_complete_301_019_011_temp_v011.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/review/301_019_011_temp_v011.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_011_temp_v011.mov
+[2026-07-30 16:04:11] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v011/.render_complete_301_019_011_temp_v011.json
+[qt_bake_oiio] Start TC: 00:00:00:09 (source: frame-derived)
+[qt_bake_oiio] include_slate=False skip_color=False color_pipe={log_convert=True, cdl=True, show_lut=True}
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/plates/301_019_011.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_57uh88_m
+[qt_bake_oiio] Color bake: 301_019_011_temp_v011.0009.exr
+[qt_bake_oiio] Encode QT: 301_019_011_temp_v011.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/review/301_019_011_temp_v011.mov
+[qt_bake_oiio] Encode QT: 301_019_011_temp_v011.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_011_temp_v011.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 16:04:13] Uploaded Version 77218 (301_019_011_temp_v011)
+[2026-07-30 16:04:13] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v011/.render_complete_301_019_011_temp_v011.json
+[2026-07-30 16:12:51] Found 1 flag(s)
+[2026-07-30 16:12:51] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011__v001/.render_complete_301_019_011__v001.json
+[2026-07-30 16:12:51] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011__v001/.render_complete_301_019_011__v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/review/301_019_011__v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_011__v001.mov
+[2026-07-30 16:12:55] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011__v001/.render_complete_301_019_011__v001.json
+[qt_bake_oiio] Start TC: 00:00:00:09 (source: frame-derived)
+[qt_bake_oiio] include_slate=False skip_color=False color_pipe={log_convert=False, cdl=True, show_lut=False}
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/plates/301_019_011.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: skipped (color_pipe.show_lut=false)
+[qt_bake_oiio] LogC4 convert: skipped (color_pipe.log_convert=false)
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_iecwy1tg
+[qt_bake_oiio] Raw clamp: 301_019_011__v001.0009.exr
+[qt_bake_oiio] Encode QT: 301_019_011__v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/review/301_019_011__v001.mov
+[qt_bake_oiio] Encode QT: 301_019_011__v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_011__v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 16:12:57] Uploaded Version 77219 (301_019_011__v001)
+[2026-07-30 16:12:57] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011__v001/.render_complete_301_019_011__v001.json
+[2026-07-30 17:37:26] Found 1 flag(s)
+[2026-07-30 17:37:26] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v001/.render_complete_301_019_011_temp_v001.json
+[2026-07-30 17:37:26] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v001/.render_complete_301_019_011_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/review/301_019_011_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_011_temp_v001.mov
+[2026-07-30 17:37:30] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v001/.render_complete_301_019_011_temp_v001.json
+[qt_bake_oiio] Start TC: 00:00:00:09 (source: frame-derived)
+[qt_bake_oiio] include_slate=False skip_color=False color_pipe={log_convert=True, cdl=True, show_lut=False}
+[qt_bake_oiio] CDL: none found at /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/plates/301_019_011.cc — baking UNGRADED
+[qt_bake_oiio] Show LUT: skipped (color_pipe.show_lut=false)
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_1k_dtat7
+[qt_bake_oiio] Color bake: 301_019_011_temp_v001.0009.exr
+[qt_bake_oiio] Encode QT: 301_019_011_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/review/301_019_011_temp_v001.mov
+[qt_bake_oiio] Encode QT: 301_019_011_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_07_30/301_019_011_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-07-30 17:37:32] Uploaded Version 77220 (301_019_011_temp_v001)
+[2026-07-30 17:37:32] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_019/301_019_011/render/work/301_019_011_temp_v001/.render_complete_301_019_011_temp_v001.json
+[2026-08-02 15:32:02] Found 1 flag(s)
+[2026-08-02 15:32:02] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/render/work/301_002_010_temp_v001/.render_complete_301_002_010_temp_v001.json
+[2026-08-02 15:32:02] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/render/work/301_002_010_temp_v001/.render_complete_301_002_010_temp_v001.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/review/301_002_010_temp_v001.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_08_02/301_002_010_temp_v001.mov
+[2026-08-02 15:46:50] [qt_bake_oiio] Reading flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/render/work/301_002_010_temp_v001/.render_complete_301_002_010_temp_v001.json
+[qt_bake_oiio] Start TC: 01:00:24:04 (source: flag)
+[qt_bake_oiio] include_slate=True skip_color=False color_pipe={log_convert=True, cdl=True, show_lut=True}
+[qt_bake_oiio] CDL: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/plates/301_002_010_BG1.cdl
+[qt_bake_oiio] Show LUT: applying /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze
+[qt_bake_oiio] Delivery: letterboxing to 1920x1080
+[qt_bake_oiio] Working in temp dir: /var/folders/_h/w9ptdbtj069_yzcysbkzc0l40000gq/T/qt_bake_s7asyoxc
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1001.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1002.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1003.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1004.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1005.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1006.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1007.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1008.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1009.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1010.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1011.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1012.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1013.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1014.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1015.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1016.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1017.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1018.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1019.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1020.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1021.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1022.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1023.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1024.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1025.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1026.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1027.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1028.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1029.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1030.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1031.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1032.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1033.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1034.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1035.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1036.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1037.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1038.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1039.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1040.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1041.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1042.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1043.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1044.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1045.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1046.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1047.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1048.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1049.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1050.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1051.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1052.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1053.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1054.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1055.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1056.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1057.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1058.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1059.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1060.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1061.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1062.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1063.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1064.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1065.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1066.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1067.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1068.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1069.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1070.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1071.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1072.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1073.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1074.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1075.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1076.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1077.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1078.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1079.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1080.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1081.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1082.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1083.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1084.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1085.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1086.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1087.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1088.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1089.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1090.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1091.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1092.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1093.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1094.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1095.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1096.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1097.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1098.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1099.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1100.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1101.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1102.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1103.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1104.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1105.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1106.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1107.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1108.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1109.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1110.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1111.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1112.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1113.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1114.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1115.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1116.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1117.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1118.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1119.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1120.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1121.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1122.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1123.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1124.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1125.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1126.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1127.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1128.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1129.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1130.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1131.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1132.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1133.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1134.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1135.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1136.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1137.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1138.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1139.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1140.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1141.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1142.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1143.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1144.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1145.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1146.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1147.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1148.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1149.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1150.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1151.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1152.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1153.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1154.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1155.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1156.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1157.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1158.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1159.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1160.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1161.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1162.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1163.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1164.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1165.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1166.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1167.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1168.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1169.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1170.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1171.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1172.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1173.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1174.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1175.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1176.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1177.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1178.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1179.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1180.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1181.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1182.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1183.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1184.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1185.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1186.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1187.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1188.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1189.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1190.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1191.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1192.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1193.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1194.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1195.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1196.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1197.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1198.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1199.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1200.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1201.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1202.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1203.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1204.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1205.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1206.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1207.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1208.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1209.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1210.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1211.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1212.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1213.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1214.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1215.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1216.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1217.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1218.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1219.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1220.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1221.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1222.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1223.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1224.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1225.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1226.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1227.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1228.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1229.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1230.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1231.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1232.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1233.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1234.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1235.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1236.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1237.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1238.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1239.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1240.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1241.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1242.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1243.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1244.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1245.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1246.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1247.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1248.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1249.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1250.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1251.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1252.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1253.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1254.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1255.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1256.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1257.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1258.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1259.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1260.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1261.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1262.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1263.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1264.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1265.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1266.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1267.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1268.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1269.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1270.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1271.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1272.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1273.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1274.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1275.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1276.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1277.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1278.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1279.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1280.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1281.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1282.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1283.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1284.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1285.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1286.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1287.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1288.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1289.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1290.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1291.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1292.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1293.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1294.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1295.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1296.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1297.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1298.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1299.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1300.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1301.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1302.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1303.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1304.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1305.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1306.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1307.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1308.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1309.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1310.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1311.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1312.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1313.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1314.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1315.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1316.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1317.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1318.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1319.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1320.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1321.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1322.exr
+[qt_bake_oiio] Color bake: 301_002_010_temp_v001.1323.exr
+[qt_bake_oiio] Thumbnail bake: 301_002_010_temp_v001.1001.exr
+[qt_bake_oiio] Thumbnail bake: 301_002_010_temp_v001.1162.exr
+[qt_bake_oiio] Thumbnail bake: 301_002_010_temp_v001.1323.exr
+[qt_bake_oiio] Slate frame (title + thumbnails + strip + text)
+[qt_bake_oiio] Encode QT: 301_002_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/review/301_002_010_temp_v001.mov
+[qt_bake_oiio] Encode QT: 301_002_010_temp_v001.mov
+[qt_bake_oiio] Written: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_08_02/301_002_010_temp_v001.mov
+[qt_bake_oiio] Done. Wrote 2 output(s).
+
+[2026-08-02 15:47:14] Uploaded Version 77279 (301_002_010_temp_v001)
+[2026-08-02 15:47:14] Processed: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/render/work/301_002_010_temp_v001/.render_complete_301_002_010_temp_v001.json
+[2026-08-03 09:42:52] Found 1 flag(s)
+[2026-08-03 09:42:52] Found flag: /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/render/work/301_002_010_temp_v002/.render_complete_301_002_010_temp_v002.json
+[2026-08-03 09:42:52] Running OIIO bake: /opt/homebrew/bin/python3 /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher/scripts/qt_bake_oiio.py /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/render/work/301_002_010_temp_v002/.render_complete_301_002_010_temp_v002.json /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/301/301_002/301_002_010/review/301_002_010_temp_v002.mov /Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial/to_editorial/2026_08_03/301_002_010_temp_v002.mov

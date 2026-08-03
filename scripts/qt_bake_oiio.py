@@ -365,7 +365,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
     Stages can be turned off (Review Drop preview / color_pipe flag) for
     inspection. Defaults keep the historical full bake.
 
-    cdl_path     : path to a per-shot .cc to apply, or None to skip.
+    cdl_path     : path to a per-shot .cdl/.cc to apply, or None to skip.
     use_show_lut : if True (and the LUT file exists), apply the show LUT for
                    the final LogC4->Rec.709 step. If False and log convert is
                    on, fall back to a generic LogC4 display transform only
@@ -860,22 +860,29 @@ def bake_sequence(data, output_paths):
         % (include_slate, skip_color, apply_log, apply_cdl_stage, want_show_lut)
     )
 
-    # CDL path (shots only — assets skip CDL). CDL is an optional creative
-    # grade: if absent, skip it but log so it's visible that the QT is
-    # ungraded. color_pipe.cdl=False forces skip even when a .cc exists.
+    # CDL path (shots only — assets skip CDL). Primary: plates/{Shot}_BG1.cdl.
+    # Optional creative grade: if absent, skip it but log so it's visible that
+    # the QT is ungraded. color_pipe.cdl=False forces skip even when a file exists.
+    # Legacy fallbacks: {Shot}.cdl, {Shot}.cc.
     cdl_path = None
     if is_shot_context(data) and not skip_color and apply_cdl_stage:
         shot = data.get("shot_code", "")
         episode = str(data.get("episode", ""))
         # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
         mid = str(data.get("sequence") or data.get("scene") or "")
-        cdl_guess = os.path.join(
+        plates_dir = os.path.join(
             "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots",
-            episode, mid, shot, "plates", "%s.cc" % shot,
+            episode, mid, shot, "plates",
         )
-        if os.path.exists(cdl_guess):
-            cdl_path = cdl_guess
-            print("[qt_bake_oiio] CDL: applying %s" % cdl_guess)
+        cdl_candidates = [
+            os.path.join(plates_dir, "%s_BG1.cdl" % shot),
+            os.path.join(plates_dir, "%s.cdl" % shot),
+            os.path.join(plates_dir, "%s.cc" % shot),
+        ]
+        cdl_guess = cdl_candidates[0]
+        cdl_path = next((p_ for p_ in cdl_candidates if os.path.exists(p_)), None)
+        if cdl_path:
+            print("[qt_bake_oiio] CDL: applying %s" % cdl_path)
         else:
             print("[qt_bake_oiio] CDL: none found at %s — baking UNGRADED" % cdl_guess)
     else:

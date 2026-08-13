@@ -19,15 +19,18 @@ Slate frame:
         Asset: type / script_name / real_name / variant / Step / Version /
                Artist / Date / Submitted For / Description
 
-Burn-ins on every frame:
+Framing mask:
+    Semi-transparent 2.39 letterbox (50% black) over the 16:9 frame, so
+    review can still see what falls outside the frame line. Disable or
+    retune per-flag with aspect_mask / aspect_mask_ratio /
+    aspect_mask_opacity.
+
+Burn-ins on every frame (drawn on top of the mask):
     Upper left:    "In House - {artist}"  (shots)
                    "{type} / {script} / {real} / {variant}"  (assets)
-    Upper right:   date
-    Lower left:    "{shot}_{step}_v{version}"  or
-                   "{script}_{real}_{variant}_{step}_v{version}"
-    Bottom center: source frame number
-    Bottom right:  source timecode (HH:MM:SS:FF), anchored to start_timecode
-                   Directly above it: two small status dots reporting
+    Upper center:  date
+    Upper right:   source timecode (HH:MM:SS:FF), anchored to start_timecode
+                   Directly below it: two small status dots reporting
                    whether the per-shot CDL and the show LUT were actually
                    found and applied for this bake.
                      green  - stage found on disk and applied
@@ -134,6 +137,26 @@ STATUS_DOT_COLORS = {
     "warn": STATUS_COLOR_WARN,
     "bad": STATUS_COLOR_BAD,
 }
+
+# ---------------------------------------------------------------------------
+# Framing mask
+# ---------------------------------------------------------------------------
+# A semi-transparent letterbox showing the 2.39 extraction on a 16:9
+# deliverable. Deliberately NOT opaque - review needs to see what's outside
+# the frame line (boom mics, rig, edges of set), which is the whole reason
+# for masking rather than hard-cropping.
+#
+# Bar height is computed by ffmpeg from the actual frame dimensions
+# ((ih - iw/ratio) / 2), so it stays correct if DELIVERY_* ever changes.
+#
+# Per-flag overrides:
+#   "aspect_mask":       false      - turn it off for this bake
+#   "aspect_mask_ratio": 1.85       - mask to a different ratio
+#   "aspect_mask_opacity": 0.35     - lighter/heavier
+MASK_ENABLED_DEFAULT = True
+MASK_RATIO = 2.39
+MASK_OPACITY = 0.5
+
 
 # ---------------------------------------------------------------------------
 # Slate title + thumbnails + bottom strip
@@ -636,7 +659,7 @@ def build_drawtext_filters(data, frame_offset, start_tc,
             data.get("version", 1),
         )
 
-    upper_right = str(data.get("date", ""))[:10]  # YYYY-MM-DD only
+    upper_centre = str(data.get("date", ""))[:10]  # YYYY-MM-DD only
     font_size = 28
     margin = 40
 
@@ -646,16 +669,51 @@ def build_drawtext_filters(data, frame_offset, start_tc,
 
     filters = []
 
+    # Framing mask FIRST, so every burn-in below draws on top of it at full
+    # strength. Reversing this order dims the text along with the picture.
+    pipe = data.get("color_pipe") or {}
+    mask_on = data.get("aspect_mask", MASK_ENABLED_DEFAULT)
+    if mask_on:
+        try:
+            ratio = float(data.get("aspect_mask_ratio", MASK_RATIO))
+        except (TypeError, ValueError):
+            ratio = MASK_RATIO
+        try:
+            opacity = float(data.get("aspect_mask_opacity", MASK_OPACITY))
+        except (TypeError, ValueError):
+            opacity = MASK_OPACITY
+        opacity = min(max(opacity, 0.0), 1.0)
+        if ratio > 0:
+            # (ih - iw/ratio)/2 per bar. Evaluated by ffmpeg against the real
+            # frame size, so this is resolution-independent.
+            bar = "(ih-iw/%.6f)/2" % ratio
+            for y in ("0", "ih-%s" % bar):
+                filters.append(
+                    "drawbox=x=0:y=%s:w=iw:h=%s:color=black@%.3f:t=fill"
+                    % (y, bar, opacity)
+                )
+
     # Upper left
     filters.append(
         "drawtext=text='%s':x=%d:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
         % (esc(upper_left), margin, margin, font_size)
     )
 
-    # Upper right
+    # Upper CENTRE: date (moved from upper right, which the timecode now owns)
     filters.append(
-        "drawtext=text='%s':x=w-%d-tw:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (esc(upper_right), margin, margin, font_size)
+        "drawtext=text='%s':x=(w-tw)/2:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (esc(upper_centre), margin, font_size)
+    )
+
+    # Upper RIGHT: SOURCE timecode, anchored to start_tc and auto-incremented
+    # by drawtext per output frame. Editorial-accurate source TC, NOT elapsed
+    # playback time. A space 'text' is required alongside the timecode option
+    # on many ffmpeg builds.
+    tc_esc = start_tc.replace(":", r"\:")
+    filters.append(
+        "drawtext=timecode='%s':timecode_rate=%d:text=' ':x=w-%d-tw:y=%d"
+        ":fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (tc_esc, FPS, margin, margin, font_size)
     )
 
     # Lower left
@@ -673,17 +731,6 @@ def build_drawtext_filters(data, frame_offset, start_tc,
         % (frame_offset, margin, font_size)
     )
 
-    # Bottom right: SOURCE timecode, anchored to start_tc and auto-incremented
-    # by drawtext per output frame. This shows editorial-accurate source TC,
-    # NOT elapsed playback time. A space 'text' is required alongside the
-    # timecode option on many ffmpeg builds.
-    tc_esc = start_tc.replace(":", r"\:")
-    filters.append(
-        "drawtext=timecode='%s':timecode_rate=%d:text=' ':x=w-%d-tw:y=h-%d-th"
-        ":fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (tc_esc, FPS, margin, margin, font_size)
-    )
-
     # CDL / Show LUT status dots: a subtle row of small colored squares
     # right-aligned to the same margin as the timecode, directly above it.
     # Fixed pixel math off DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to
@@ -692,10 +739,13 @@ def build_drawtext_filters(data, frame_offset, start_tc,
     # Order is pipeline order [cdl, lut], rendered right-to-left so the LUT
     # dot (or whichever one remains, on asset turntables) sits closest to
     # the timecode/margin.
+    #
+    # These sit directly BELOW the timecode, having followed it to the top
+    # right - they annotate the timecode block, and would read as stray marks
+    # if left behind at the bottom of frame.
     active_dots = [s for s in (cdl_status, lut_status) if s is not None]
     if active_dots:
-        dot_row_bottom_y = DELIVERY_HEIGHT - margin - font_size - STATUS_DOT_Y_GAP
-        dot_row_top_y = dot_row_bottom_y - STATUS_DOT_SIZE
+        dot_row_top_y = margin + font_size + STATUS_DOT_Y_GAP
         n = len(active_dots)
         for idx, status in enumerate(active_dots):
             slot_from_right = n - 1 - idx

@@ -42,7 +42,6 @@ render_complete_callback.py. Key fields used here:
 """
 
 import datetime
-import glob
 import json
 import math
 import os
@@ -365,6 +364,14 @@ def resolve_start_timecode(data, exr_pattern, first):
 
 SHOTS_ROOT = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots"
 
+# Accepted per-shot LUT extensions, in PRIORITY order: if a shot somehow has
+# both, .cube wins. Rationale - .cube is unambiguously a 3D lattice
+# (iridas/resolve), whereas OCIO maps .lut to two different formats
+# ("Discreet 1D LUT" and "houdini"), and the Discreet one is 1D only, so it
+# cannot carry a full 3D creative look. When in doubt, prefer the format that
+# can represent the whole grade.
+LUT_EXTENSIONS = (".cube", ".lut")
+
 
 def shot_plates_dir(data):
     """Absolute path to a shot's plates/ folder, or None for non-shot context.
@@ -387,19 +394,21 @@ def shot_plates_dir(data):
 def resolve_lut_path(data):
     """Find this shot's own LUT in its plates/ folder.
 
-    Per-shot LUTs live beside the plates and are named after the plate with
-    a .lut extension, e.g.
+    Per-shot LUTs live beside the plates and are named after the plate,
+    with either a .cube or a .lut extension, e.g.
 
-        plates/301_001_0050.####.exr  ->  plates/301_001_0050.lut
+        plates/301_001_0050.####.exr  ->  plates/301_001_0050.cube
+                                     or   plates/301_001_0050.lut
 
-    Resolution order:
-      1. <plates>/<shot_code>.lut          - the normal case
-      2. exactly one *.lut in plates/      - covers plates carrying a take or
+    Resolution order (extensions tried in LUT_EXTENSIONS priority order,
+    .cube before .lut; matching is case-insensitive so .CUBE/.Lut also work):
+      1. <plates>/<shot_code>.<ext>        - the normal case
+      2. exactly one *.<ext> in plates/    - covers plates carrying a take or
                                              vendor suffix, where the LUT is
                                              named after that plate rather
                                              than the bare shot code
-      3. several *.lut in plates/          - ambiguous; picks the first in
-                                             sorted order and logs ALL of
+      3. several matches in plates/        - ambiguous; picks the highest
+                                             priority one and logs ALL of
                                              them, so the QT still bakes but
                                              the ambiguity is visible
 
@@ -415,27 +424,48 @@ def resolve_lut_path(data):
         print("[qt_bake_oiio] LUT: no plates folder at %s" % plates_dir)
         return None
 
-    shot = data.get("shot_code", "")
-    exact = os.path.join(plates_dir, "%s.lut" % shot)
-    if os.path.exists(exact):
-        print("[qt_bake_oiio] LUT: applying per-shot %s" % exact)
-        return exact
+    try:
+        names = sorted(os.listdir(plates_dir))
+    except OSError as exc:
+        print("[qt_bake_oiio] LUT: could not read %s: %s" % (plates_dir, exc))
+        return None
 
-    candidates = sorted(glob.glob(os.path.join(plates_dir, "*.lut")))
+    shot = data.get("shot_code", "")
+
+    # 1. Exact <shot_code><ext>, honouring extension priority.
+    for ext in LUT_EXTENSIONS:
+        want = ("%s%s" % (shot, ext)).lower()
+        for name in names:
+            if name.lower() == want:
+                found = os.path.join(plates_dir, name)
+                print("[qt_bake_oiio] LUT: applying per-shot %s" % found)
+                return found
+
+    # 2/3. Anything else carrying an accepted extension, priority-ordered.
+    candidates = []
+    for ext in LUT_EXTENSIONS:
+        for name in names:
+            if name.lower().endswith(ext):
+                candidates.append(os.path.join(plates_dir, name))
+
     if len(candidates) == 1:
         print("[qt_bake_oiio] LUT: applying per-shot %s" % candidates[0])
         return candidates[0]
     if len(candidates) > 1:
         print(
-            "[qt_bake_oiio] LUT: WARNING - %d .lut files in %s, expected 1. "
-            "Using the first; rename so only the intended LUT is present, or "
-            "name it %s.lut to select it explicitly. Found: %s"
-            % (len(candidates), plates_dir, shot, ", ".join(
-                os.path.basename(c) for c in candidates))
+            "[qt_bake_oiio] LUT: WARNING - %d LUT files in %s, expected 1. "
+            "Using %s; rename so only the intended LUT is present, or name it "
+            "%s%s to select it explicitly. Found: %s"
+            % (len(candidates), plates_dir, os.path.basename(candidates[0]),
+               shot, LUT_EXTENSIONS[0], ", ".join(
+                   os.path.basename(c) for c in candidates))
         )
         return candidates[0]
 
-    print("[qt_bake_oiio] LUT: no per-shot .lut in %s" % plates_dir)
+    print(
+        "[qt_bake_oiio] LUT: no per-shot %s in %s"
+        % ("/".join(LUT_EXTENSIONS), plates_dir)
+    )
     return None
 
 

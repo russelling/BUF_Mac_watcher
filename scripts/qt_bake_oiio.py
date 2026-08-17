@@ -858,8 +858,9 @@ def build_drawtext_filters(data, frame_offset, start_tc,
 
     if is_shot:
         upper_left = "In House - %s" % data.get("artist", "")
-        lower_left = "%s_%s_v%03d" % (
+        lower_left = "%s_%s_%s_v%03d" % (
             data.get("shot_code", ""),
+            data.get("vendor_code") or "INH",
             data.get("step", ""),
             data.get("version", 1),
         )

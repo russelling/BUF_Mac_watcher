@@ -128,6 +128,7 @@ def resolve_shot_output_paths(tk, data):
         "Sequence":    mid,
         "Scene":       mid,  # legacy keys if any old templates remain
         "Shot":        data["shot_code"],
+        "vendor_code": data.get("vendor_code") or "INH",
         "Step":        data["step"],
         "version":     data["version"],
         "YYYY":        now.year,
@@ -258,8 +259,9 @@ def upload_version(sg, data, movie_path):
         version_num = data.get("version", 1)
         version_code = "%s_v%03d" % (_asset_publish_stem(data), version_num)
     else:
-        version_code = "%s_%s_v%03d" % (
+        version_code = "%s_%s_%s_v%03d" % (
             data.get("shot_code", ""),
+            data.get("vendor_code") or "INH",
             data.get("step", ""),
             data.get("version", 1),
         )

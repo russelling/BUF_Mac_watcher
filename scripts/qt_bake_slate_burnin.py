@@ -259,7 +259,8 @@ def build_burnins(parent, data, first_frame):
     if is_shot:
         artist     = data.get("artist", "")
         upper_left = "In House - %s" % artist
-        lower_left = "%s_%s_v%03d" % (data.get("shot_code", ""), step, version)
+        vendor_code = data.get("vendor_code") or "INH"
+        lower_left = "%s_%s_%s_v%03d" % (data.get("shot_code", ""), vendor_code, step, version)
         cut_in     = data.get("cut_in")
         cut_out    = data.get("cut_out")
     else:

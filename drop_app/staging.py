@@ -404,10 +404,14 @@ def stage_and_flag(
         episode = context["episode"]
         sequence = context["sequence"]
         shot_code = context["entity"]["code"]
+        # No Review Drop UI control for this yet - always in-house until one
+        # is added. context.get() future-proofs against that landing later.
+        vendor_code = context.get("vendor_code") or "INH"
         fields = {
             "Episode": episode,
             "Sequence": sequence,
             "Shot": shot_code,
+            "vendor_code": vendor_code,
             "Step": step,
             "version": version,
         }
@@ -420,7 +424,7 @@ def stage_and_flag(
         # Derive shot root from a known movie template (absolute path).
         sample_mov = tk.templates["ep_nuke_shot_render_movie"].apply_fields(fields)
         shot_root = Path(sample_mov).parent.parent  # .../{Shot}
-        leaf = "%s_%s_v%03d" % (shot_code, step, version)
+        leaf = "%s_%s_%s_v%03d" % (shot_code, vendor_code, step, version)
         dest_dir = shot_root / "render" / "work" / leaf
         dest_dir.mkdir(parents=True, exist_ok=True)
         _archive_originals(media, shot_root / "source" / "review_drop" / leaf)
@@ -448,6 +452,7 @@ def stage_and_flag(
             "entity_type": "Shot",
             "entity_id": context["entity"]["id"],
             "shot_code": shot_code,
+            "vendor_code": vendor_code,
             "episode": episode,
             "sequence": sequence,
             "scene": sequence,  # legacy bake scripts

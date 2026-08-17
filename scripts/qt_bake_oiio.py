@@ -45,6 +45,7 @@ import datetime
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -116,7 +117,41 @@ SLATE_TITLE = "BUFFALO S3"
 # missing, point this at any bold sans .ttf/.otf already licensed for the
 # show instead.
 TITLE_FONT_PATH = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
-TITLE_FONT_SIZE = 110
+
+# ---------------------------------------------------------------------------
+# Global text scale.
+#
+# Every piece of text drawn on the slate and the per-frame burn-ins is derived
+# from this single factor, so the whole thing can be resized in one place
+# rather than hunting down individual fontsize values.
+#
+#   1.00 = the original sizes (slate title 110, slate body 36, burn-ins 28)
+#   0.70 = 30% smaller  <- current
+#
+# Base sizes below are the ORIGINALS; do not edit them to resize. Change
+# TEXT_SCALE instead, so the slate title, slate body, line spacing and
+# burn-ins all stay in proportion with each other.
+# ---------------------------------------------------------------------------
+TEXT_SCALE = 0.70
+
+_BASE_TITLE_FONT_SIZE = 110
+_BASE_SLATE_FONT_SIZE = 36
+_BASE_SLATE_LINE_HEIGHT = 52
+_BASE_BURNIN_FONT_SIZE = 28
+
+
+def _scaled(base):
+    """Scale a base type size, never returning less than 1px."""
+    return max(1, int(round(base * TEXT_SCALE)))
+
+
+TITLE_FONT_SIZE = _scaled(_BASE_TITLE_FONT_SIZE)
+SLATE_FONT_SIZE = _scaled(_BASE_SLATE_FONT_SIZE)
+# Line spacing scales with the body text, otherwise smaller type ends up
+# floating in the original (now oversized) leading.
+SLATE_LINE_HEIGHT = _scaled(_BASE_SLATE_LINE_HEIGHT)
+BURNIN_FONT_SIZE = _scaled(_BASE_BURNIN_FONT_SIZE)
+
 TITLE_X = 80
 TITLE_Y = 50
 
@@ -328,6 +363,166 @@ def resolve_start_timecode(data, exr_pattern, first):
     return timecode_from_frame(first), "frame-derived"
 
 
+SHOTS_ROOT = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots"
+
+# Accepted per-shot LUT extensions, in PRIORITY order: if a shot somehow has
+# both, .cube wins. Rationale - .cube is unambiguously a 3D lattice
+# (iridas/resolve), whereas OCIO maps .lut to two different formats
+# ("Discreet 1D LUT" and "houdini"), and the Discreet one is 1D only, so it
+# cannot carry a full 3D creative look. When in doubt, prefer the format that
+# can represent the whole grade.
+LUT_EXTENSIONS = (".cube", ".lut")
+
+
+def shot_plates_dir(data):
+    """Absolute path to a shot's plates/ folder, or None for non-shot context.
+
+    Mirrors the layout the CDL lookup uses:
+        shots/{episode}/{sequence|scene}/{shot}/plates
+    All three components come from the flag JSON, never from parsing a
+    filename, so shot-code format changes (e.g. 3- to 4-digit shot numbers)
+    need no change here.
+    """
+    shot = data.get("shot_code", "")
+    episode = str(data.get("episode", ""))
+    # Prefer Sequence (Episode->Sequence->Shot); fall back to legacy scene.
+    mid = str(data.get("sequence") or data.get("scene") or "")
+    if not (shot and episode and mid):
+        return None
+    return os.path.join(SHOTS_ROOT, episode, mid, shot, "plates")
+
+
+def resolve_lut_path(data):
+    """Find this shot's own LUT in its plates/ folder.
+
+    Per-shot LUTs live beside the plates and are named after the plate,
+    with either a .cube or a .lut extension, e.g.
+
+        plates/301_001_0050.####.exr  ->  plates/301_001_0050.cube
+                                     or   plates/301_001_0050.lut
+
+    Resolution order (extensions tried in LUT_EXTENSIONS priority order,
+    .cube before .lut; matching is case-insensitive so .CUBE/.Lut also work):
+      1. <plates>/<shot_code>.<ext>        - the normal case
+      2. exactly one *.<ext> in plates/    - covers plates carrying a take or
+                                             vendor suffix, where the LUT is
+                                             named after that plate rather
+                                             than the bare shot code
+      3. several matches in plates/        - ambiguous; picks the highest
+                                             priority one and logs ALL of
+                                             them, so the QT still bakes but
+                                             the ambiguity is visible
+
+    Returns an absolute path, or None if there is no per-shot LUT (caller
+    falls back to SHOW_LUT_PATH). Assets have no plates folder and always
+    return None.
+    """
+    if not is_shot_context(data):
+        return None
+
+    plates_dir = shot_plates_dir(data)
+    if not plates_dir or not os.path.isdir(plates_dir):
+        print("[qt_bake_oiio] LUT: no plates folder at %s" % plates_dir)
+        return None
+
+    try:
+        names = sorted(os.listdir(plates_dir))
+    except OSError as exc:
+        print("[qt_bake_oiio] LUT: could not read %s: %s" % (plates_dir, exc))
+        return None
+
+    shot = data.get("shot_code", "")
+
+    # 1. Exact <shot_code><ext>, honouring extension priority.
+    for ext in LUT_EXTENSIONS:
+        want = ("%s%s" % (shot, ext)).lower()
+        for name in names:
+            if name.lower() == want:
+                found = os.path.join(plates_dir, name)
+                print("[qt_bake_oiio] LUT: applying per-shot %s" % found)
+                return found
+
+    # 2/3. Anything else carrying an accepted extension, priority-ordered.
+    candidates = []
+    for ext in LUT_EXTENSIONS:
+        for name in names:
+            if name.lower().endswith(ext):
+                candidates.append(os.path.join(plates_dir, name))
+
+    if len(candidates) == 1:
+        print("[qt_bake_oiio] LUT: applying per-shot %s" % candidates[0])
+        return candidates[0]
+    if len(candidates) > 1:
+        print(
+            "[qt_bake_oiio] LUT: WARNING - %d LUT files in %s, expected 1. "
+            "Using %s; rename so only the intended LUT is present, or name it "
+            "%s%s to select it explicitly. Found: %s"
+            % (len(candidates), plates_dir, os.path.basename(candidates[0]),
+               shot, LUT_EXTENSIONS[0], ", ".join(
+                   os.path.basename(c) for c in candidates))
+        )
+        return candidates[0]
+
+    print(
+        "[qt_bake_oiio] LUT: no per-shot %s in %s"
+        % ("/".join(LUT_EXTENSIONS), plates_dir)
+    )
+    return None
+
+
+def find_shot_cdl(plates_dir, shot_code):
+    """
+    Locate this shot's CDL (.cc) file.
+
+    Added 2026-08-17: shots now name their CDL {shot_code}_{layer}_v{version}.cc
+    (e.g. 301_001_050_BG01_v01.cc) instead of the old bare {shot_code}.cc --
+    layer code and version both vary per shot, so this matches by wildcard
+    rather than a fixed suffix. Mirrors resolve_lut_path()'s
+    log-every-candidate-and-pick-one approach above: if more than one
+    versioned CDL matches, picks the highest version number (assumed to be
+    the most current grade) and logs every candidate found, so a wrong pick
+    is visible rather than silent. Falls back to the older bare
+    {shot_code}.cc convention for anything that predates the versioned
+    naming.
+
+    Returns the chosen path, or None if nothing matches.
+    """
+    if not plates_dir or not os.path.isdir(plates_dir):
+        return None
+
+    pattern = re.compile(
+        r"^%s_(?P<layer>[^_]+)_v(?P<version>\d+)\.cc$" % re.escape(shot_code)
+    )
+    candidates = []
+    try:
+        names = os.listdir(plates_dir)
+    except OSError as exc:
+        print("[qt_bake_oiio] CDL: could not read %s: %s" % (plates_dir, exc))
+        names = []
+    for fname in names:
+        m = pattern.match(fname)
+        if m:
+            candidates.append((int(m.group("version")), m.group("layer"), fname))
+
+    if candidates:
+        candidates.sort()  # by version, ascending
+        chosen_version, chosen_layer, chosen_fname = candidates[-1]
+        if len(candidates) > 1:
+            print(
+                "[qt_bake_oiio] CDL: multiple candidates found for %s: %s "
+                "-- using highest version: %s"
+                % (shot_code, [c[2] for c in candidates], chosen_fname)
+            )
+        return os.path.join(plates_dir, chosen_fname)
+
+    # Legacy fallback: bare {shot_code}.cc
+    legacy = os.path.join(plates_dir, "%s.cc" % shot_code)
+    if os.path.exists(legacy):
+        return legacy
+
+    return None
+
+
 def is_shot_context(data):
     """Return True if this flag JSON is from a shot render, False for asset."""
     return data.get("type", "shot") != "asset_turntable"
@@ -337,16 +532,18 @@ def is_shot_context(data):
 # Color bake: single EXR frame -> baked PNG (for slate) or baked EXR (frames)
 # ---------------------------------------------------------------------------
 
-def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
+def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
                desqueeze_to=None, fit_to=None):
     """
     Apply full color pipeline to a single EXR frame using oiiotool:
-        ACEScg -> LogC4 -> CDL (optional) -> Show LUT -> Rec.709
+        ACEScg -> LogC4 -> CDL (optional) -> LUT -> Rec.709
 
     cdl_path     : path to a per-shot .cc to apply, or None to skip.
-    use_show_lut : if True (and the LUT file exists), apply the show LUT for
-                   the final LogC4->Rec.709 step. If False, fall back to a
-                   generic LogC4->Rec.709 colorspace conversion.
+    lut_path     : path to the LUT to apply for the final LogC4->Rec.709
+                   step - normally the shot's own plates/<plate>.lut, else
+                   the global SHOW_LUT_PATH fallback. The caller resolves
+                   and logs this (see resolve_lut_path). None means fall
+                   back to a generic LogC4->Rec.709 colorspace conversion.
     desqueeze_to : (width, height) to resize the frame to FIRST, for
                    anamorphic de-squeeze. None means no de-squeeze.
     fit_to       : (width, height) final delivery size. The (de-squeezed)
@@ -371,9 +568,10 @@ def bake_frame(src_exr, dst_png, cdl_path=None, use_show_lut=True,
     if cdl_path and os.path.exists(cdl_path):
         cmd += ["--ociofiletransform", cdl_path]
 
-    # Step 3: Show LUT -> Rec.709, or fallback display transform.
-    if use_show_lut and os.path.exists(SHOW_LUT_PATH):
-        cmd += ["--ociofiletransform", SHOW_LUT_PATH]
+    # Step 3: LUT -> Rec.709, or fallback display transform. lut_path is the
+    # shot's own plates/<plate>.lut when present, else the global show LUT.
+    if lut_path and os.path.exists(lut_path):
+        cmd += ["--ociofiletransform", lut_path]
     else:
         cmd += [
             "--ociodisplay:from=%s" % OCIO_LOGC4,
@@ -418,9 +616,9 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, fit_to=None):
     run(cmd, label="Passthrough: %s" % os.path.basename(src_path))
 
 
-def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size):
+def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size):
     """
-    Same color pipeline as bake_frame (ACEScg -> LogC4 -> CDL -> Show LUT ->
+    Same color pipeline as bake_frame (ACEScg -> LogC4 -> CDL -> LUT ->
     Rec.709), but for a small slate collage print rather than a delivery
     frame: resizes directly to the exact (w, h) box with NO letterbox
     padding, since the collage prints sit on the slate's own black/white
@@ -439,8 +637,8 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, use_show_lut, desqueeze_to, size)
     if cdl_path and os.path.exists(cdl_path):
         cmd += ["--ociofiletransform", cdl_path]
 
-    if use_show_lut and os.path.exists(SHOW_LUT_PATH):
-        cmd += ["--ociofiletransform", SHOW_LUT_PATH]
+    if lut_path and os.path.exists(lut_path):
+        cmd += ["--ociofiletransform", lut_path]
     else:
         cmd += [
             "--ociodisplay:from=%s" % OCIO_LOGC4,
@@ -508,7 +706,7 @@ def build_drawtext_filters(data, frame_offset, start_tc):
         )
 
     upper_right = str(data.get("date", ""))[:10]  # YYYY-MM-DD only
-    font_size = 28
+    font_size = BURNIN_FONT_SIZE
     margin = 40
 
     # Escape for FFmpeg filter syntax (colons and quotes).
@@ -568,7 +766,7 @@ def _esc_drawtext(s):
 
 
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
-                     tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to,
+                     tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to,
                      skip_color=False):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
@@ -582,7 +780,7 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
     width/height are the OUTPUT dimensions - must match the (possibly
     de-squeezed) image frames so concat/append doesn't mismatch.
 
-    tmpdir, exr_pattern, cdl_path, use_show_lut, desqueeze_to are passed
+    tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to are passed
     through from bake_sequence() so the thumbnails can be baked with the
     exact same color decisions (CDL presence, show LUT presence, de-squeeze)
     already resolved for the main bake - no re-deriving them here.
@@ -612,8 +810,8 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
         "Description: %s" % data.get("description", ""),
     ]
 
-    font_size = 36
-    line_height = 52
+    font_size = SLATE_FONT_SIZE
+    line_height = SLATE_LINE_HEIGHT
     margin_x = 80
     # Pushed down from the old start_y=280 to clear the new title block
     # (TITLE_Y + TITLE_FONT_SIZE + breathing room).
@@ -677,15 +875,15 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
         else:
             bake_thumbnail(
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
-                cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+                cdl_path, lut_path, desqueeze_to, SBS_SIZE,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
-                cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+                cdl_path, lut_path, desqueeze_to, SBS_SIZE,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
-                cdl_path, use_show_lut, desqueeze_to, SBS_SIZE,
+                cdl_path, lut_path, desqueeze_to, SBS_SIZE,
             )
     else:
         print(
@@ -813,38 +1011,41 @@ def bake_sequence(data, output_paths):
     cdl_path = None
     if is_shot_context(data) and not skip_color:
         shot = data.get("shot_code", "")
-        episode = str(data.get("episode", ""))
-        # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
-        mid = str(data.get("sequence") or data.get("scene") or "")
-        cdl_guess = os.path.join(
-            "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots",
-            episode, mid, shot, "plates", "%s.cc" % shot,
-        )
-        if os.path.exists(cdl_guess):
-            cdl_path = cdl_guess
-            print("[qt_bake_oiio] CDL: applying %s" % cdl_guess)
+        # Same plates/ folder the per-shot LUT comes from (see shot_plates_dir).
+        plates_dir = shot_plates_dir(data)
+        cdl_path = find_shot_cdl(plates_dir, shot)
+        if cdl_path:
+            print("[qt_bake_oiio] CDL: applying %s" % cdl_path)
         else:
-            print("[qt_bake_oiio] CDL: none found at %s — baking UNGRADED" % cdl_guess)
+            print(
+                "[qt_bake_oiio] CDL: none found under %s for shot %s — baking UNGRADED"
+                % (plates_dir, shot)
+            )
     else:
         if skip_color:
             print("[qt_bake_oiio] CDL/LUT: skipped (skip_color)")
         else:
             print("[qt_bake_oiio] CDL: skipped (asset turntable)")
 
-    # Show LUT presence: decided once. If missing, fall back to a generic
-    # LogC4->Rec.709 conversion (viewable, roughly correct) rather than
-    # shipping flat log. Log it loudly since the look will differ from final.
-    use_show_lut = (not skip_color) and os.path.exists(SHOW_LUT_PATH)
+    # LUT: decided once, here, so every frame + thumbnail in this bake uses
+    # exactly the same one. Prefers the shot's own plates/<plate>.lut, falls
+    # back to the global show LUT, and finally to a generic LogC4->Rec.709
+    # display transform (viewable, roughly correct) rather than shipping flat
+    # log. Every branch logs, since the look differs between them.
     if skip_color:
-        use_show_lut = False
-    elif use_show_lut:
-        print("[qt_bake_oiio] Show LUT: applying %s" % SHOW_LUT_PATH)
+        lut_path = None
     else:
-        print(
-            "[qt_bake_oiio] Show LUT: NOT FOUND at %s — falling back to display "
-            "transform '%s' / '%s'. Look will differ from final show look."
-            % (SHOW_LUT_PATH, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
-        )
+        lut_path = resolve_lut_path(data)
+        if lut_path is None and os.path.exists(SHOW_LUT_PATH):
+            lut_path = SHOW_LUT_PATH
+            print("[qt_bake_oiio] LUT: falling back to show LUT %s" % SHOW_LUT_PATH)
+        elif lut_path is None:
+            print(
+                "[qt_bake_oiio] LUT: no per-shot LUT and show LUT NOT FOUND at %s "
+                "— falling back to display transform '%s' / '%s'. Look will "
+                "differ from final show look."
+                % (SHOW_LUT_PATH, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
+            )
 
     # Anamorphic de-squeeze + fixed delivery size. Read the pixel aspect
     # ratio and resolution ONCE from the first frame (a sequence shares one
@@ -890,7 +1091,7 @@ def bake_sequence(data, output_paths):
                 )
             else:
                 bake_frame(
-                    src, dst, cdl_path=cdl_path, use_show_lut=use_show_lut,
+                    src, dst, cdl_path=cdl_path, lut_path=lut_path,
                     desqueeze_to=desqueeze_to, fit_to=fit_to,
                 )
             baked_frames.append(dst)
@@ -905,7 +1106,7 @@ def bake_sequence(data, output_paths):
             build_slate_png(
                 data, slate_path, first, last, start_tc, out_w, out_h,
                 tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
-                use_show_lut=use_show_lut, desqueeze_to=desqueeze_to,
+                lut_path=lut_path, desqueeze_to=desqueeze_to,
                 skip_color=skip_color,
             )
 
@@ -988,7 +1189,7 @@ def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
                 data, slate_path, first, last, start_tc,
                 DELIVERY_WIDTH, DELIVERY_HEIGHT,
                 tmpdir=tmpdir, exr_pattern="", cdl_path=None,
-                use_show_lut=False, desqueeze_to=None,
+                lut_path=None, desqueeze_to=None,
             )
 
         if include_slate:

@@ -18,8 +18,8 @@ Builds:
           Frame Range, Start TC, Submitted For, Description
 
       Asset context:
-          Show logo, Asset Type / Asset, Step, Version, Artist, Date,
-          Submitted For, Description
+          Show logo, type / script_name / real_name / variant, Step,
+          Version, Artist, Date, Submitted For, Description
 
   - Burn-ins on every frame:
 
@@ -31,9 +31,9 @@ Builds:
           bottom right : timecode
 
       Asset (turntable):
-          upper left   : "{asset_type} - {asset_name}"
+          upper left   : "{type} / {script} / {real} / {variant}"
           upper right  : date
-          lower left   : "{asset}_{step}_v{version}"
+          lower left   : "{script}_{real}_{variant}_{step}_v{version}"
           bottom center: frame counter (always white)
           bottom right : timecode
 
@@ -52,6 +52,7 @@ render_complete_callback.py. Key fields used here:
 
 import json
 import os
+import re
 import sys
 
 import nuke
@@ -89,6 +90,49 @@ def is_shot_context(data):
     return data.get("type", "shot") != "asset_turntable"
 
 
+def find_shot_cdl(plates_dir, shot_code):
+    """
+    Locate this shot's CDL. Kept in lockstep with find_shot_cdl() in
+    qt_bake_oiio.py -- if that naming convention changes again, update both.
+
+    Added 2026-08-17: shots now name their CDL {shot_code}_{layer}_v{version}.cc
+    (e.g. 301_001_050_BG01_v01.cc) -- layer code and version both vary per
+    shot, so this matches by wildcard rather than a fixed suffix, preferring
+    the highest version when more than one matches. Falls back to this
+    script's older candidate list ({shot}_BG1.cdl, {shot}.cdl, {shot}.cc)
+    for anything that predates the versioned naming.
+    """
+    if not plates_dir or not os.path.isdir(plates_dir):
+        return None
+
+    pattern = re.compile(
+        r"^%s_(?P<layer>[^_]+)_v(?P<version>\d+)\.cc$" % re.escape(shot_code)
+    )
+    candidates = []
+    for fname in os.listdir(plates_dir):
+        m = pattern.match(fname)
+        if m:
+            candidates.append((int(m.group("version")), m.group("layer"), fname))
+
+    if candidates:
+        candidates.sort()
+        chosen_version, chosen_layer, chosen_fname = candidates[-1]
+        if len(candidates) > 1:
+            nuke.tprint(
+                "[qt_bake] CDL: multiple candidates found for %s: %s "
+                "-- using highest version: %s"
+                % (shot_code, [c[2] for c in candidates], chosen_fname)
+            )
+        return os.path.join(plates_dir, chosen_fname)
+
+    legacy_candidates = [
+        os.path.join(plates_dir, "%s_BG1.cdl" % shot_code),
+        os.path.join(plates_dir, "%s.cdl" % shot_code),
+        os.path.join(plates_dir, "%s.cc" % shot_code),
+    ]
+    return next((p_ for p_ in legacy_candidates if os.path.exists(p_)), None)
+
+
 def get_frame_range(data):
     """
     Return (first, last) as ints from the flag.
@@ -123,17 +167,18 @@ def build_color_bake(read_node, data):
 
     last = cs1
 
-    # CDL: shots only — look for a per-shot .cc file
+    # CDL: shots only — primary is plates/{Shot}_BG1.cdl; legacy {Shot}.cc still accepted.
     if is_shot_context(data):
         shot    = data.get("shot_code", "")
         episode = str(data.get("episode", ""))
         # Prefer Sequence (Episode→Sequence→Shot); fall back to legacy scene.
         mid = str(data.get("sequence") or data.get("scene") or "")
-        cdl_path = os.path.join(
+        plates_dir = os.path.join(
             "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots",
-            episode, mid, shot, "plates", "%s.cc" % shot,
+            episode, mid, shot, "plates",
         )
-        if os.path.exists(cdl_path):
+        cdl_path = find_shot_cdl(plates_dir, shot)
+        if cdl_path:
             cdl = nuke.createNode("OCIOFileTransform", inpanel=False)
             cdl.setInput(0, last)
             cdl["file"].setValue(p(cdl_path))
@@ -218,10 +263,21 @@ def build_burnins(parent, data, first_frame):
         cut_in     = data.get("cut_in")
         cut_out    = data.get("cut_out")
     else:
-        asset_name  = data.get("entity_name", "")
-        asset_type  = data.get("asset_type", "Asset")
-        upper_left  = "%s - %s" % (asset_type, asset_name)
-        lower_left  = "%s_%s_v%03d" % (asset_name, step, version)
+        script = data.get("script_name") or data.get("entity_name", "")
+        real = data.get("real_name") or ""
+        variant = data.get("variant") or ""
+        upper_left = " / ".join(
+            p for p in (
+                data.get("asset_type", "Asset"),
+                script,
+                real,
+                variant,
+            ) if p
+        )
+        stem_parts = [p for p in (script, real, variant) if p]
+        if step:
+            stem_parts.append(step)
+        lower_left = "%s_v%03d" % ("_".join(stem_parts), version)
         cut_in = cut_out = None
 
     last = parent
@@ -304,9 +360,13 @@ def build_slate(data, first_frame, last_frame):
             data.get("shot_code", ""),
         )
     else:
-        context_line = "%s / %s" % (
-            data.get("asset_type", "Asset"),
-            data.get("entity_name", ""),
+        context_line = " / ".join(
+            p for p in (
+                data.get("asset_type", "Asset"),
+                data.get("script_name") or data.get("entity_name", ""),
+                data.get("real_name") or "",
+                data.get("variant") or "",
+            ) if p
         )
 
     start_tc = data.get("start_timecode")

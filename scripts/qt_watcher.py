@@ -145,27 +145,47 @@ def resolve_shot_output_paths(tk, data):
     return shot_movie_path, editorial_movie_path
 
 
+def _asset_hierarchy_fields(data):
+    """
+    Toolkit / path fields for the asset location schema:
+
+      {type}/{script_name}/{real_name}/{variant}
+    """
+    script_name = (
+        data.get("script_name")
+        or data.get("entity_name")
+        or data.get("Asset")
+        or ""
+    )
+    return {
+        "Asset": script_name,
+        "sg_asset_type": data.get("asset_type") or data.get("sg_asset_type") or "",
+        "script_name": script_name,
+        "real_name": data.get("real_name") or "base",
+        "variant": data.get("variant") or "base",
+        "version": int(data.get("version") or 1),
+    }
+
+
+def _asset_publish_stem(data, step=None):
+    """Version / movie stem: {script}_{real}_{variant}[_{step}]."""
+    fields = _asset_hierarchy_fields(data)
+    parts = [fields["script_name"], fields["real_name"], fields["variant"]]
+    use_step = step if step is not None else data.get("step", "")
+    use_step = (use_step or "").strip()
+    if use_step and use_step not in {"reference", "ingest"}:
+        parts.append(use_step)
+    return "_".join(p for p in parts if p)
+
+
 def resolve_asset_output_paths(tk, data):
     """Resolve output paths for an asset turntable flag."""
     now = datetime.datetime.now()
-    asset_name = data["entity_name"]
-    asset_type = data.get("asset_type", "Asset")
-    version    = data["version"]
-
-    fields = {
-        "Asset":        asset_name,
-        "sg_asset_type": asset_type,
-        "version":      version,
-    }
+    version = data["version"]
+    fields = _asset_hierarchy_fields(data)
     asset_movie_path = tk.templates["unreal_asset_turntable_movie"].apply_fields(fields)
 
     # Also drop a copy to the dated editorial folder
-    editorial_fields = {
-        "YYYY": now.year,
-        "MM":   now.month,
-        "DD":   now.day,
-        # Reuse editorial template if it exists, otherwise build path manually
-    }
     editorial_dir = os.path.join(
         "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/io/editorial",
         "to_editorial",
@@ -173,7 +193,7 @@ def resolve_asset_output_paths(tk, data):
     )
     editorial_movie_path = os.path.join(
         editorial_dir,
-        "%s_turntable_v%03d.mov" % (asset_name, version),
+        "%s_v%03d.mov" % (_asset_publish_stem(data), version),
     )
     return asset_movie_path, editorial_movie_path
 
@@ -235,10 +255,8 @@ def upload_version(sg, data, movie_path):
     is_asset = data.get("type") == "asset_turntable"
 
     if is_asset:
-        entity_name = data.get("entity_name", "")
-        step        = data.get("step", "")
         version_num = data.get("version", 1)
-        version_code = "%s_%s_turntable_v%03d" % (entity_name, step, version_num)
+        version_code = "%s_v%03d" % (_asset_publish_stem(data), version_num)
     else:
         version_code = "%s_%s_v%03d" % (
             data.get("shot_code", ""),

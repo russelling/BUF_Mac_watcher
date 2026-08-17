@@ -19,13 +19,29 @@ Slate frame:
         Asset: Asset Type / Asset / Step / Version / Artist / Date /
                Submitted For / Description
 
-Burn-ins on every frame:
+Framing mask:
+    Semi-transparent 2.39 letterbox (50% black) over the 16:9 frame, so
+    review can still see what falls outside the frame line. Disable or
+    retune per-flag with aspect_mask / aspect_mask_ratio /
+    aspect_mask_opacity.
+
+Burn-ins on every frame (drawn on top of the mask):
     Upper left:    "In House - {artist}"  (shots)
                    "{asset_type} - {asset}"  (assets)
-    Upper right:   date
+    Upper center:  date
+    Upper right:   source timecode (HH:MM:SS:FF), anchored to start_timecode
+                   Directly below it: two small status dots reporting
+                   whether the per-shot CDL and the LUT were actually found
+                   and applied for this bake.
+                     green  - stage found on disk and applied
+                     yellow - stage intentionally disabled (color_pipe flag)
+                     red    - stage expected but NOT found (ungraded /
+                              un-LUT'd - this QT does not reflect final look)
+                   The CDL dot is omitted on asset turntables (no per-shot
+                   CDL concept there). Both dots are omitted on skip_color /
+                   movie-passthrough bakes (no OCIO pipe runs at all).
     Lower left:    "{shot}_{step}_v{version}"  or  "{asset}_{step}_v{version}"
     Bottom center: source frame number
-    Bottom right:  source timecode (HH:MM:SS:FF), anchored to start_timecode
 
 Requires:
     brew install ffmpeg openimageio
@@ -102,6 +118,47 @@ FPS = 24
 # pillarboxed to exactly this, regardless of source resolution or squeeze.
 DELIVERY_WIDTH = 1920
 DELIVERY_HEIGHT = 1080
+
+# ---------------------------------------------------------------------------
+# CDL / Show LUT status dots (burn-in, next to the top-right timecode)
+# ---------------------------------------------------------------------------
+# Small filled squares (not circles - avoids depending on a font that has a
+# glyph for one) stacked in a single row, right-aligned to the same margin
+# as the timecode, directly below it. Deliberately subtle: ~8px, muted
+# colors, a thin dark outline so they read against any footage without
+# shouting over the shot. Positions are computed from the fixed
+# DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to that size) rather than
+# ffmpeg's runtime w/h expressions, since dot size never changes per-frame.
+STATUS_DOT_SIZE = 8
+STATUS_DOT_GAP = 5          # horizontal gap between the two dots
+STATUS_DOT_Y_GAP = 10       # vertical gap between the TC row and the dot row
+STATUS_COLOR_OK = "0x33CC33"     # green  - found on disk and applied
+STATUS_COLOR_WARN = "0xE6C229"   # yellow - intentionally off (color_pipe flag)
+STATUS_COLOR_BAD = "0xD93025"    # red    - expected but not found on disk
+STATUS_DOT_COLORS = {
+    "ok": STATUS_COLOR_OK,
+    "warn": STATUS_COLOR_WARN,
+    "bad": STATUS_COLOR_BAD,
+}
+
+# ---------------------------------------------------------------------------
+# Framing mask
+# ---------------------------------------------------------------------------
+# A semi-transparent letterbox showing the 2.39 extraction on a 16:9
+# deliverable. Deliberately NOT opaque - review needs to see what's outside
+# the frame line (boom mics, rig, edges of set), which is the whole reason
+# for masking rather than hard-cropping.
+#
+# Bar height is computed by ffmpeg from the actual frame dimensions
+# ((ih - iw/ratio) / 2), so it stays correct if DELIVERY_* ever changes.
+#
+# Per-flag overrides:
+#   "aspect_mask":       false      - turn it off for this bake
+#   "aspect_mask_ratio": 1.85       - mask to a different ratio
+#   "aspect_mask_opacity": 0.35     - lighter/heavier
+MASK_ENABLED_DEFAULT = True
+MASK_RATIO = 2.39
+MASK_OPACITY = 0.5
 
 # ---------------------------------------------------------------------------
 # Slate title + thumbnails + bottom strip
@@ -528,51 +585,137 @@ def is_shot_context(data):
     return data.get("type", "shot") != "asset_turntable"
 
 
+def compute_indicator_statuses(data, skip_color, cdl_path, apply_cdl_stage,
+                                apply_lut_stage, lut_path):
+    """
+    Work out the two burn-in status-dot states for this bake.
+
+    Returns (cdl_status, lut_status). Each is one of:
+      None    - dot omitted entirely. Asset turntables have no per-shot CDL
+                concept (cdl_status only). skip_color / movie-passthrough
+                bakes run no OCIO pipe at all (both statuses).
+      "ok"    - stage found on disk and applied.
+      "warn"  - stage intentionally turned off via the color_pipe flag. Not
+                a bug, but worth flagging so an intentional preview isn't
+                mistaken for a finaled grade.
+      "bad"   - stage was expected/requested but the file could not be
+                found on disk (ungraded CDL, or no LUT resolved at all —
+                per-shot AND show LUT both missing — falling back to a
+                generic display transform).
+
+    lut_path is the already-resolved path from resolve_lut_path() / the
+    SHOW_LUT_PATH fallback (see bake_sequence) - truthy means SOME LUT
+    (per-shot or show) was found on disk, regardless of which.
+
+    Deliberately keyed off apply_cdl_stage/apply_lut_stage/lut_path directly
+    rather than re-deriving from bake_frame's internal fallback logic, so
+    this stays correct even if that logic changes.
+    """
+    if skip_color:
+        return None, None
+
+    if is_shot_context(data):
+        if not apply_cdl_stage:
+            cdl_status = "warn"
+        elif cdl_path:
+            cdl_status = "ok"
+        else:
+            cdl_status = "bad"
+    else:
+        cdl_status = None  # assets have no per-shot CDL concept
+
+    if not apply_lut_stage:
+        lut_status = "warn"
+    elif lut_path:
+        lut_status = "ok"
+    else:
+        lut_status = "bad"
+
+    return cdl_status, lut_status
+
+
 # ---------------------------------------------------------------------------
 # Color bake: single EXR frame -> baked PNG (for slate) or baked EXR (frames)
 # ---------------------------------------------------------------------------
 
-def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
-               desqueeze_to=None, fit_to=None):
+def color_pipe_stages(data, skip_color=False):
     """
-    Apply full color pipeline to a single EXR frame using oiiotool:
+    Per-stage color pipe from the Review Drop flag.
+
+    Flag shape (all default True when absent — matches historical bakes):
+      "color_pipe": {"log_convert": bool, "cdl": bool, "show_lut": bool}
+    """
+    if skip_color:
+        return False, False, False
+    pipe = data.get("color_pipe") or {}
+    return (
+        bool(pipe.get("log_convert", True)),
+        bool(pipe.get("cdl", True)),
+        bool(pipe.get("show_lut", True)),
+    )
+
+
+def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
+               desqueeze_to=None, fit_to=None, apply_log_convert=True,
+               apply_cdl=True, apply_lut_stage=True):
+    """
+    Apply the show color pipeline to a single EXR frame using oiiotool:
         ACEScg -> LogC4 -> CDL (optional) -> LUT -> Rec.709
 
-    cdl_path     : path to a per-shot .cc to apply, or None to skip.
-    lut_path     : path to the LUT to apply for the final LogC4->Rec.709
-                   step - normally the shot's own plates/<plate>.lut, else
-                   the global SHOW_LUT_PATH fallback. The caller resolves
-                   and logs this (see resolve_lut_path). None means fall
-                   back to a generic LogC4->Rec.709 colorspace conversion.
-    desqueeze_to : (width, height) to resize the frame to FIRST, for
-                   anamorphic de-squeeze. None means no de-squeeze.
-    fit_to       : (width, height) final delivery size. The (de-squeezed)
-                   image is letterboxed/pillarboxed to fit EXACTLY this box,
-                   preserving aspect with black bars. None means no fit.
+    Stages can be turned off (Review Drop preview / color_pipe flag) for
+    inspection. Defaults keep the historical full bake.
+
+    cdl_path        : path to a per-shot .cc to apply, or None to skip.
+    lut_path        : path to the LUT to apply for the final LogC4->Rec.709
+                       step - normally the shot's own plates/<plate>.lut,
+                       else the global SHOW_LUT_PATH fallback (resolved by
+                       the caller, see resolve_lut_path). None/missing falls
+                       back to a generic LogC4->Rec.709 display transform,
+                       still shown if log convert is on.
+    apply_log_convert / apply_cdl / apply_lut_stage : per-stage enables from
+                       color_pipe.
+    desqueeze_to / fit_to : geometry (see prior docstring).
 
     Output is an 8-bit PNG suitable for ffmpeg input.
     """
+    want_cdl = bool(apply_cdl and cdl_path and os.path.exists(cdl_path))
+    lut_exists = bool(lut_path and os.path.exists(lut_path))
+    apply_lut = bool(apply_lut_stage and lut_exists)
+    # Display fallback only when a graded look was asked for, no LUT is
+    # available/enabled, and we still have LogC4 to display from.
+    use_display = bool(apply_lut_stage and not apply_lut and apply_log_convert)
+
+    # Nothing from the show pipe: clamp scene-linear (inspection mode).
+    if not apply_log_convert and not want_cdl and not apply_lut and not use_display:
+        cmd = [OIIOTOOL, src_exr]
+        if desqueeze_to is not None:
+            dw, dh = desqueeze_to
+            cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+        if fit_to is not None:
+            fw, fh = fit_to
+            cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+        cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
+        run(cmd, label="Raw clamp: %s" % os.path.basename(src_exr))
+        return
+
     # The OCIO config must be set ONCE, up front, via the top-level
     # --colorconfig flag. It is NOT a valid modifier on --colorconvert or
     # --ociofiletransform (those only accept key=/value=/unpremult=/etc).
     cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
 
     # Step 1: ACEScg -> LogC4 via OCIO
-    cmd += [
-        "--colorconvert",
-        OCIO_ACESCG,
-        OCIO_LOGC4,
-    ]
+    if apply_log_convert:
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
 
     # Step 2: CDL if present (caller has already decided and logged).
-    if cdl_path and os.path.exists(cdl_path):
+    if want_cdl:
         cmd += ["--ociofiletransform", cdl_path]
 
     # Step 3: LUT -> Rec.709, or fallback display transform. lut_path is the
     # shot's own plates/<plate>.lut when present, else the global show LUT.
-    if lut_path and os.path.exists(lut_path):
+    if apply_lut:
         cmd += ["--ociofiletransform", lut_path]
-    else:
+    elif use_display:
         cmd += [
             "--ociodisplay:from=%s" % OCIO_LOGC4,
             OCIO_REC709_DISPLAY,
@@ -595,7 +738,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
     # NOTE: --clamp takes min=/max= as colon-appended MODIFIERS, not
     # positional args. "--clamp 0 1" makes oiiotool treat 0 and 1 as input
     # filenames (-> "File does not exist: 0").
-    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
+    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
 
     run(cmd, label="Color bake: %s" % os.path.basename(src_exr))
 
@@ -616,9 +759,10 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, fit_to=None):
     run(cmd, label="Passthrough: %s" % os.path.basename(src_path))
 
 
-def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size):
+def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
+                    apply_log_convert=True, apply_cdl=True, apply_lut_stage=True):
     """
-    Same color pipeline as bake_frame (ACEScg -> LogC4 -> CDL -> LUT ->
+    Same color stages as bake_frame (ACEScg -> LogC4 -> CDL -> LUT ->
     Rec.709), but for a small slate collage print rather than a delivery
     frame: resizes directly to the exact (w, h) box with NO letterbox
     padding, since the collage prints sit on the slate's own black/white
@@ -630,16 +774,35 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size):
     per the existing convention in this file - keeps each bake path self
     contained and easy to reason about independently.
     """
+    want_cdl = bool(apply_cdl and cdl_path and os.path.exists(cdl_path))
+    lut_exists = bool(lut_path and os.path.exists(lut_path))
+    apply_lut = bool(apply_lut_stage and lut_exists)
+    use_display = bool(apply_lut_stage and not apply_lut and apply_log_convert)
+    w, h = size
+
+    if not apply_log_convert and not want_cdl and not apply_lut and not use_display:
+        cmd = [OIIOTOOL, src_exr]
+        if desqueeze_to is not None:
+            dw, dh = desqueeze_to
+            cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
+        cmd += [
+            "--resize:filter=lanczos3", "%dx%d" % (w, h),
+            "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png,
+        ]
+        run(cmd, label="Thumbnail clamp: %s" % os.path.basename(src_exr))
+        return
+
     cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
 
-    cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
+    if apply_log_convert:
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
 
-    if cdl_path and os.path.exists(cdl_path):
+    if want_cdl:
         cmd += ["--ociofiletransform", cdl_path]
 
-    if lut_path and os.path.exists(lut_path):
+    if apply_lut:
         cmd += ["--ociofiletransform", lut_path]
-    else:
+    elif use_display:
         cmd += [
             "--ociodisplay:from=%s" % OCIO_LOGC4,
             OCIO_REC709_DISPLAY,
@@ -650,10 +813,10 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size):
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
 
-    w, h = size
-    cmd += ["--resize:filter=lanczos3", "%dx%d" % (w, h)]
-
-    cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-o", dst_png]
+    cmd += [
+        "--resize:filter=lanczos3", "%dx%d" % (w, h),
+        "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png,
+    ]
 
     run(cmd, label="Thumbnail bake: %s" % os.path.basename(src_exr))
 
@@ -674,16 +837,22 @@ def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size):
 # Burn-ins: overlay text onto frames using FFmpeg drawtext
 # ---------------------------------------------------------------------------
 
-def build_drawtext_filters(data, frame_offset, start_tc):
+def build_drawtext_filters(data, frame_offset, start_tc,
+                            cdl_status=None, lut_status=None):
     """
-    Build FFmpeg drawtext filter chain for burn-ins.
+    Build FFmpeg drawtext filter chain for burn-ins (and the framing mask).
 
     frame_offset : added to ffmpeg's 0-based output frame index so the
                    bottom-center counter shows the real source frame number.
-    start_tc     : source start timecode (HH:MM:SS:FF) for the bottom-right
+    start_tc     : source start timecode (HH:MM:SS:FF) for the upper-right
                    burn-in. Already offset by the caller to account for the
                    prepended slate, so it reads correctly on the first image
                    frame.
+    cdl_status,
+    lut_status   : "ok" / "warn" / "bad" / None - see
+                   compute_indicator_statuses(). Rendered as small status
+                   dots directly below the timecode burn-in; None omits the
+                   corresponding dot entirely.
     """
     is_shot = is_shot_context(data)
 
@@ -705,7 +874,7 @@ def build_drawtext_filters(data, frame_offset, start_tc):
             data.get("version", 1),
         )
 
-    upper_right = str(data.get("date", ""))[:10]  # YYYY-MM-DD only
+    upper_centre = str(data.get("date", ""))[:10]  # YYYY-MM-DD only
     font_size = BURNIN_FONT_SIZE
     margin = 40
 
@@ -715,16 +884,50 @@ def build_drawtext_filters(data, frame_offset, start_tc):
 
     filters = []
 
+    # Framing mask FIRST, so every burn-in below draws on top of it at full
+    # strength. Reversing this order dims the text along with the picture.
+    mask_on = data.get("aspect_mask", MASK_ENABLED_DEFAULT)
+    if mask_on:
+        try:
+            ratio = float(data.get("aspect_mask_ratio", MASK_RATIO))
+        except (TypeError, ValueError):
+            ratio = MASK_RATIO
+        try:
+            opacity = float(data.get("aspect_mask_opacity", MASK_OPACITY))
+        except (TypeError, ValueError):
+            opacity = MASK_OPACITY
+        opacity = min(max(opacity, 0.0), 1.0)
+        if ratio > 0:
+            # (ih - iw/ratio)/2 per bar. Evaluated by ffmpeg against the real
+            # frame size, so this is resolution-independent.
+            bar = "(ih-iw/%.6f)/2" % ratio
+            for y in ("0", "ih-%s" % bar):
+                filters.append(
+                    "drawbox=x=0:y=%s:w=iw:h=%s:color=black@%.3f:t=fill"
+                    % (y, bar, opacity)
+                )
+
     # Upper left
     filters.append(
         "drawtext=text='%s':x=%d:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
         % (esc(upper_left), margin, margin, font_size)
     )
 
-    # Upper right
+    # Upper CENTRE: date (moved from upper right, which the timecode now owns)
     filters.append(
-        "drawtext=text='%s':x=w-%d-tw:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (esc(upper_right), margin, margin, font_size)
+        "drawtext=text='%s':x=(w-tw)/2:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (esc(upper_centre), margin, font_size)
+    )
+
+    # Upper RIGHT: SOURCE timecode, anchored to start_tc and auto-incremented
+    # by drawtext per output frame. Editorial-accurate source TC, NOT elapsed
+    # playback time. A space 'text' is required alongside the timecode option
+    # on many ffmpeg builds.
+    tc_esc = start_tc.replace(":", r"\:")
+    filters.append(
+        "drawtext=timecode='%s':timecode_rate=%d:text=' ':x=w-%d-tw:y=%d"
+        ":fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (tc_esc, FPS, margin, margin, font_size)
     )
 
     # Lower left
@@ -742,16 +945,38 @@ def build_drawtext_filters(data, frame_offset, start_tc):
         % (frame_offset, margin, font_size)
     )
 
-    # Bottom right: SOURCE timecode, anchored to start_tc and auto-incremented
-    # by drawtext per output frame. This shows editorial-accurate source TC,
-    # NOT elapsed playback time. A space 'text' is required alongside the
-    # timecode option on many ffmpeg builds.
-    tc_esc = start_tc.replace(":", r"\:")
-    filters.append(
-        "drawtext=timecode='%s':timecode_rate=%d:text=' ':x=w-%d-tw:y=h-%d-th"
-        ":fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (tc_esc, FPS, margin, margin, font_size)
-    )
+    # CDL / Show LUT status dots: a subtle row of small colored squares
+    # right-aligned to the same margin as the timecode. Fixed pixel math off
+    # DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to that size) rather
+    # than ffmpeg's dynamic tw/th, since the dots are a constant size
+    # regardless of what text renders alongside them. Order is pipeline
+    # order [cdl, lut], rendered right-to-left so the LUT dot (or whichever
+    # one remains, on asset turntables) sits closest to the timecode/margin.
+    #
+    # These sit directly BELOW the timecode, having followed it to the top
+    # right - they annotate the timecode block, and would read as stray
+    # marks if left behind at the bottom of frame.
+    active_dots = [s for s in (cdl_status, lut_status) if s is not None]
+    if active_dots:
+        dot_row_top_y = margin + font_size + STATUS_DOT_Y_GAP
+        n = len(active_dots)
+        for idx, status in enumerate(active_dots):
+            slot_from_right = n - 1 - idx
+            dot_x = (
+                DELIVERY_WIDTH - margin - STATUS_DOT_SIZE
+                - slot_from_right * (STATUS_DOT_SIZE + STATUS_DOT_GAP)
+            )
+            color = STATUS_DOT_COLORS[status]
+            # 1px dark outline behind each dot so it stays legible against
+            # any footage color (including footage close to the dot color).
+            filters.append(
+                "drawbox=x=%d:y=%d:w=%d:h=%d:color=black@0.6:t=fill"
+                % (dot_x - 1, dot_row_top_y - 1, STATUS_DOT_SIZE + 2, STATUS_DOT_SIZE + 2)
+            )
+            filters.append(
+                "drawbox=x=%d:y=%d:w=%d:h=%d:color=%s:t=fill"
+                % (dot_x, dot_row_top_y, STATUS_DOT_SIZE, STATUS_DOT_SIZE, color)
+            )
 
     return ",".join(filters)
 
@@ -767,22 +992,24 @@ def _esc_drawtext(s):
 
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                      tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to,
-                     skip_color=False):
+                     skip_color=False, apply_log_convert=True, apply_cdl=True,
+                     apply_lut_stage=True):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
     background, a row of three equal-size frame thumbnails (first/mid/last)
     below it, the show logo top right, and a grayscale + color bar reference
     strip along the bottom. The three thumbnails are run through the same
-    full color pipeline as the deliverable frames (ACEScg -> LogC4 -> CDL ->
-    Show LUT -> Rec.709), so they match the graded look of the shot rather
-    than showing raw/log plates.
+    color pipeline as the deliverable frames (ACEScg -> LogC4 -> CDL -> LUT
+    -> Rec.709, including the apply_log_convert/apply_cdl/apply_lut_stage
+    color_pipe toggles from Review Drop), so they match whatever look the
+    deliverable frames actually got rather than showing raw/log plates.
 
     width/height are the OUTPUT dimensions - must match the (possibly
     de-squeezed) image frames so concat/append doesn't mismatch.
 
     tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to are passed
     through from bake_sequence() so the thumbnails can be baked with the
-    exact same color decisions (CDL presence, show LUT presence, de-squeeze)
+    exact same color decisions (CDL presence, LUT presence, de-squeeze)
     already resolved for the main bake - no re-deriving them here.
     """
     is_shot = is_shot_context(data)
@@ -876,14 +1103,20 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
             bake_thumbnail(
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
+                apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
+                apply_lut_stage=apply_lut_stage,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
+                apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
+                apply_lut_stage=apply_lut_stage,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
+                apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
+                apply_lut_stage=apply_lut_stage,
             )
     else:
         print(
@@ -988,10 +1221,12 @@ def bake_sequence(data, output_paths):
       include_slate  - bool, default True
       skip_color     - bool, default False (MOV/QT sources)
       movie_path     - path to an existing .mov/.mp4 when skip_color is True
+      color_pipe     - {log_convert, cdl, show_lut} stage toggles (default all on)
     """
     include_slate = data.get("include_slate", True)
     skip_color = data.get("skip_color", False)
     movie_path = data.get("movie_path")
+    apply_log, apply_cdl_stage, apply_lut_stage = color_pipe_stages(data, skip_color)
 
     if skip_color and movie_path:
         bake_movie_passthrough(data, output_paths, movie_path, include_slate)
@@ -1003,13 +1238,17 @@ def bake_sequence(data, output_paths):
     # Resolve the source start timecode (flag -> EXR -> frame-derived).
     start_tc, tc_source = resolve_start_timecode(data, exr_pattern, first)
     print("[qt_bake_oiio] Start TC: %s (source: %s)" % (start_tc, tc_source))
-    print("[qt_bake_oiio] include_slate=%s skip_color=%s" % (include_slate, skip_color))
+    print(
+        "[qt_bake_oiio] include_slate=%s skip_color=%s "
+        "color_pipe={log_convert=%s, cdl=%s, show_lut=%s}"
+        % (include_slate, skip_color, apply_log, apply_cdl_stage, apply_lut_stage)
+    )
 
     # CDL path (shots only — assets skip CDL). CDL is an optional creative
     # grade: if absent, skip it but log so it's visible that the QT is
-    # ungraded.
+    # ungraded. color_pipe.cdl=False forces skip even when a .cc exists.
     cdl_path = None
-    if is_shot_context(data) and not skip_color:
+    if is_shot_context(data) and not skip_color and apply_cdl_stage:
         shot = data.get("shot_code", "")
         # Same plates/ folder the per-shot LUT comes from (see shot_plates_dir).
         plates_dir = shot_plates_dir(data)
@@ -1024,6 +1263,8 @@ def bake_sequence(data, output_paths):
     else:
         if skip_color:
             print("[qt_bake_oiio] CDL/LUT: skipped (skip_color)")
+        elif not apply_cdl_stage:
+            print("[qt_bake_oiio] CDL: skipped (color_pipe.cdl=false)")
         else:
             print("[qt_bake_oiio] CDL: skipped (asset turntable)")
 
@@ -1031,7 +1272,10 @@ def bake_sequence(data, output_paths):
     # exactly the same one. Prefers the shot's own plates/<plate>.lut, falls
     # back to the global show LUT, and finally to a generic LogC4->Rec.709
     # display transform (viewable, roughly correct) rather than shipping flat
-    # log. Every branch logs, since the look differs between them.
+    # log. Every branch logs, since the look differs between them. The
+    # resolution itself always runs (cheap) regardless of apply_lut_stage —
+    # bake_frame/bake_thumbnail are what actually gate on the toggle — so the
+    # status dot can still report whether a LUT WOULD have been found.
     if skip_color:
         lut_path = None
     else:
@@ -1046,6 +1290,11 @@ def bake_sequence(data, output_paths):
                 "differ from final show look."
                 % (SHOW_LUT_PATH, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
             )
+        if not apply_lut_stage:
+            print("[qt_bake_oiio] LUT: stage disabled (color_pipe.show_lut=false)")
+
+    if not apply_log:
+        print("[qt_bake_oiio] LogC4 convert: skipped (color_pipe.log_convert=false)")
 
     # Anamorphic de-squeeze + fixed delivery size. Read the pixel aspect
     # ratio and resolution ONCE from the first frame (a sequence shares one
@@ -1093,6 +1342,8 @@ def bake_sequence(data, output_paths):
                 bake_frame(
                     src, dst, cdl_path=cdl_path, lut_path=lut_path,
                     desqueeze_to=desqueeze_to, fit_to=fit_to,
+                    apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
+                    apply_lut_stage=apply_lut_stage,
                 )
             baked_frames.append(dst)
 
@@ -1108,9 +1359,15 @@ def bake_sequence(data, output_paths):
                 tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
                 lut_path=lut_path, desqueeze_to=desqueeze_to,
                 skip_color=skip_color,
+                apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
+                apply_lut_stage=apply_lut_stage,
             )
 
         # ── 3. Build frame list for FFmpeg concat ─────────────────────────────
+        # The trailing duplicate of the last file is required so the previous
+        # duration= line actually applies — but ffmpeg also encodes that
+        # duplicate as a real frame. Cap with -frames:v below so a single EXR
+        # stays one image frame (plus optional slate), not two.
         concat_list = os.path.join(tmpdir, "frames.txt")
         with open(concat_list, "w") as f:
             if slate_path:
@@ -1121,6 +1378,8 @@ def bake_sequence(data, output_paths):
                 f.write("duration %f\n" % (1.0 / FPS))
             if baked_frames:
                 f.write("file '%s'\n" % baked_frames[-1])
+
+        expected_frames = len(baked_frames) + (1 if slate_path else 0)
 
         if include_slate:
             # Slate at output index 0; first image frame at index 1.
@@ -1134,7 +1393,13 @@ def bake_sequence(data, output_paths):
             burnin_offset = first
             burnin_start_tc = start_tc
 
-        burnin_filters = build_drawtext_filters(data, burnin_offset, burnin_start_tc)
+        cdl_status, lut_status = compute_indicator_statuses(
+            data, skip_color, cdl_path, apply_cdl_stage, apply_lut_stage, lut_path,
+        )
+        burnin_filters = build_drawtext_filters(
+            data, burnin_offset, burnin_start_tc,
+            cdl_status=cdl_status, lut_status=lut_status,
+        )
         embed_tc = burnin_start_tc
 
         # ── 4+5. Encode to ProRes QT with burn-ins and TC track ───────────────
@@ -1149,6 +1414,7 @@ def bake_sequence(data, output_paths):
                 "-safe", "0",
                 "-i", concat_list,
                 "-vf", burnin_filters,
+                "-frames:v", str(expected_frames),
                 "-c:v", "prores_ks",
                 "-profile:v", "3",        # ProRes 422 HQ
                 "-vendor", "apl0",

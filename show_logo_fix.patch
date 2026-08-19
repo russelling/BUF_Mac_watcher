@@ -1,0 +1,63 @@
+From 1a6935d2e7b008c4e84373d52cc826845e2c1cca Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 22:14:06 +0000
+Subject: [PATCH] Fix show_logo template path; document that it is unused
+
+show_logo pointed at shots/GLOBALS/logo/teardrop.png -- a folder that does
+not exist. The _globals convention is already used by the LUT paths a few
+lines above in this file; show_logo was missed when that move happened.
+
+Corrected to shots/_globals/logo/teardrop_blk1.png, which is the file the
+bake actually uses, and annotated with two things that were not obvious:
+
+1. NOTHING in FlowTrackingConfig resolves this template. Verified by grep.
+   The slate logo is hardcoded in qt_bake_oiio.py (BUF_Mac_watcher) as
+   LOGO_PATH. Editing this template does not change the slate -- that has
+   to happen in the other repo. The template is corrected so it stops
+   being actively misleading, not because it does anything.
+
+2. qt_bake_oiio.py guards the logo with os.path.exists() and silently
+   renders an unbranded slate when it is missing. A wrong logo path is a
+   silent quality regression, not a visible failure -- worth knowing given
+   the 2026-08-17 incident where a silent watcher failure went unnoticed
+   for over a week.
+
+Confirmed on disk 2026-08-19: the folder holds teardrop.png,
+teardrop_blk.png and teardrop_blk1.png. teardrop_blk and teardrop_blk1 are
+the same size (likely duplicates). Only teardrop_blk1.png is world-readable
+(rw-r--r--); the other two are rw-------, which would break the bake if the
+watcher ever ran as a different user.
+---
+ core/templates.yml | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/core/templates.yml b/core/templates.yml
+index be246f2..a010d4a 100644
+--- a/core/templates.yml
++++ b/core/templates.yml
+@@ -528,7 +528,21 @@ paths:
+         definition: 'editorial/to_editorial/{YYYY}_{MM}_{DD}/{Shot}_{Step}[_{nuke.output}]_v{version}.mov'
+ 
+     show_logo:
+-        definition: 'shots/GLOBALS/logo/teardrop.png'
++        # UNUSED BY THIS CONFIG as of 2026-08-19 -- nothing in FlowTrackingConfig
++        # resolves this template. Kept in sync with reality so it isn't
++        # misleading, but EDITING IT DOES NOT CHANGE THE SLATE.
++        #
++        # The slate logo is hardcoded in qt_bake_oiio.py (BUF_Mac_watcher) as
++        # LOGO_PATH = .../shots/_globals/logo/teardrop_blk1.png -- change it
++        # THERE. Note that script guards with os.path.exists() and silently
++        # renders an unbranded slate if the file is missing, so a bad path
++        # here fails quietly rather than loudly.
++        #
++        # Was 'shots/GLOBALS/logo/teardrop.png' -- that folder does not exist;
++        # the _globals convention (see LUT paths above) is correct.
++        # Folder contains teardrop.png, teardrop_blk.png, teardrop_blk1.png;
++        # only _blk1 is world-readable and only _blk1 is the one in use.
++        definition: 'shots/_globals/logo/teardrop_blk1.png'
+ 
+     ep_nuke_shot_render_flag:
+         definition: '@shot_base/render/work/{Shot}_{Step}[_{nuke.output}]_v{version}/.render_complete_{Shot}_{Step}[_{nuke.output}]_v{version}.json'
+-- 
+2.43.0
+

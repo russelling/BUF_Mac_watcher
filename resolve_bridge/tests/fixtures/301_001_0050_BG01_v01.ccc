@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ColorCorrectionCollection>
+  <ColorCorrection id="wide">
+    <SOPNode>
+      <Slope>1.0 1.0 1.0</Slope>
+      <Offset>0.0 0.0 0.0</Offset>
+      <Power>1.0 1.0 1.0</Power>
+    </SOPNode>
+    <SATNode>
+      <Saturation>1.0</Saturation>
+    </SATNode>
+  </ColorCorrection>
+  <ColorCorrection id="close">
+    <SOPNode>
+      <Slope>0.9 0.95 1.0</Slope>
+      <Offset>0.0 0.0 0.02</Offset>
+      <Power>1.0 1.0 1.0</Power>
+    </SOPNode>
+    <SATNode>
+      <Saturation>0.9</Saturation>
+    </SATNode>
+  </ColorCorrection>
+</ColorCorrectionCollection>

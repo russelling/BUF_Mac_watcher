@@ -18,7 +18,7 @@ import os
 import sys
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtGui import QFont, QPixmap, QTextCursor
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
@@ -47,6 +47,26 @@ STATE_WORD = {
     "warn":    "ATTENTION",
     "stopped": "STOPPED",
 }
+
+# Brand mark. The dark teardrop reads correctly on the pale Lumon field.
+# Tried in order because the variants differ in readability on the share -
+# see core/templates.yml's show_logo note. Missing art is not an error: the
+# masthead simply renders without it, exactly as drop_app does.
+LOGO_DIR = (
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/logo"
+)
+LOGO_CANDIDATES = ("teardrop.png", "teardrop_blk1.png", "teardrop_blk.png")
+LOGO_HEIGHT = 54
+
+
+def find_logo():
+    """First readable teardrop variant, or None."""
+    for name in LOGO_CANDIDATES:
+        path = os.path.join(LOGO_DIR, name)
+        if os.path.isfile(path) and os.access(path, os.R_OK):
+            return path
+    return None
+
 
 RULE_CSS = "background: %s;" % theme.STRUCTURE_LINE
 READOUT_KEY_CSS = (
@@ -78,14 +98,38 @@ class MonitorWindow(QMainWindow):
         outer.setSpacing(0)
 
         # -- Masthead --------------------------------------------------------
+        # Wordmark left, teardrop right: the mark closes the header band
+        # rather than competing with the brand for the same corner.
+        mast = QHBoxLayout()
+        mast.setSpacing(16)
+
+        mast_text = QVBoxLayout()
+        mast_text.setSpacing(0)
+
         brand = QLabel("QT WATCHER")
         brand.setFont(QFont("", 20, QFont.Bold))
         brand.setStyleSheet("%s letter-spacing: 5px;" % theme.BRAND_CSS)
-        outer.addWidget(brand)
+        mast_text.addWidget(brand)
 
         subtitle = QLabel("BUFFALO VFX  ·  RENDER MONITORING")
         subtitle.setStyleSheet(theme.SUBTITLE_CSS)
-        outer.addWidget(subtitle)
+        mast_text.addWidget(subtitle)
+
+        mast.addLayout(mast_text)
+        mast.addStretch(1)
+
+        logo = QLabel()
+        logo.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        logo_path = find_logo()
+        if logo_path:
+            pix = QPixmap(logo_path)
+            if not pix.isNull():
+                logo.setPixmap(
+                    pix.scaledToHeight(LOGO_HEIGHT, Qt.SmoothTransformation)
+                )
+        mast.addWidget(logo)
+
+        outer.addLayout(mast)
 
         outer.addSpacing(18)
         outer.addWidget(_rule())

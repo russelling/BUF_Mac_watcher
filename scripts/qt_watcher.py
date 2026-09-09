@@ -73,6 +73,10 @@ MAX_FLAG_FAILURES = 3
 # watcher is distinguishable from a dead one. 120 * 30s = once an hour.
 HEARTBEAT_EVERY_N_POLLS = 120
 
+# Extension of the h264 web-review proxy written beside each baked QT by
+# qt_bake_oiio.write_review_proxy(). Kept in sync with REVIEW_PROXY_EXT there.
+REVIEW_PROXY_EXT = ".mp4"
+
 # "delete" or "rename" — what to do with flag files after processing
 PROCESSED_ACTION = "rename"
 
@@ -356,8 +360,24 @@ def _valid_list_values(sg, entity_type, field_name):
     return None
 
 
-def upload_version(sg, data, movie_path):
-    """Create a Version in ShotGrid and upload the QT."""
+def review_proxy_path(movie_path):
+    """Path of the h264 review proxy written beside a baked QT.
+
+    Mirrors qt_bake_oiio.review_proxy_path() - same stem, .mp4.
+    """
+    return os.path.splitext(movie_path)[0] + REVIEW_PROXY_EXT
+
+
+def upload_version(sg, data, movie_path, upload_path=None):
+    """Create a Version in ShotGrid and upload media to it.
+
+    movie_path  : the ProRes deliverable. Recorded in sg_path_to_movie, so
+                  RV/Toolkit still open the full-quality QT off the share.
+    upload_path : what actually gets pushed to sg_uploaded_movie, i.e. what
+                  the web player shows. Defaults to movie_path; the caller
+                  passes the small h264 proxy when one was baked.
+    """
+    upload_path = upload_path or movie_path
     is_asset = data.get("type") == "asset_turntable"
 
     if is_asset:
@@ -417,12 +437,12 @@ def upload_version(sg, data, movie_path):
         sg.upload(
             "Version",
             version["id"],
-            movie_path,
+            upload_path,
             field_name="sg_uploaded_movie",
         )
     except Exception as exc:
-        log("ERROR uploading movie to Version %s (%s): %s"
-            % (version["id"], version_code, exc))
+        log("ERROR uploading %s to Version %s (%s): %s"
+            % (os.path.basename(upload_path), version["id"], version_code, exc))
         try:
             sg.delete("Version", version["id"])
             log("Removed orphaned Version %s so the retry won't duplicate it"
@@ -433,7 +453,8 @@ def upload_version(sg, data, movie_path):
                 % (version["id"], del_exc))
         return None
 
-    log("Uploaded Version %s (%s)" % (version["id"], version_code))
+    log("Uploaded Version %s (%s) — media: %s"
+        % (version["id"], version_code, os.path.basename(upload_path)))
     return version
 
 
@@ -540,7 +561,19 @@ def process_flag(tk, sg, flag_path):
             "%s — flag left in place for retry" % primary_path)
         return False
 
-    if upload_version(sg, data, primary_path) is None:
+    # Upload the small h264 proxy the bake wrote beside the ProRes - that is
+    # what the ShotGrid web player can actually stream. sg_path_to_movie still
+    # records the ProRes. If the proxy is missing (older bake, or the proxy
+    # encode failed) fall back to the ProRes rather than skipping the upload.
+    proxy_path = review_proxy_path(primary_path)
+    if os.path.exists(proxy_path):
+        upload_path = proxy_path
+    else:
+        upload_path = primary_path
+        log("WARNING: no review proxy at %s — uploading the ProRes instead. "
+            "It is large and ShotGrid may fail to transcode it." % proxy_path)
+
+    if upload_version(sg, data, primary_path, upload_path=upload_path) is None:
         log("ERROR: ShotGrid upload failed for %s — flag left in place for retry"
             % flag_path)
         return False

@@ -120,6 +120,27 @@ DELIVERY_WIDTH = 1920
 DELIVERY_HEIGHT = 1080
 
 # ---------------------------------------------------------------------------
+# Web review proxy (h264 .mp4)
+# ---------------------------------------------------------------------------
+# ProRes 422 HQ is the DELIVERABLE - it is what lands in the shot review
+# folder and the editorial drop, and what sg_path_to_movie points at. It is a
+# poor thing to hand ShotGrid, though: ~220 Mbit/s means a modest shot is
+# hundreds of MB, uploads are slow and failure-prone, and ShotGrid only
+# transcodes it down to h264 for the web player anyway.
+#
+# So every bake also writes a small h264 sibling next to the primary output
+# (same stem, .mp4) purely for ShotGrid to ingest. qt_watcher uploads THAT to
+# sg_uploaded_movie. Nothing editorial receives changes.
+#
+# yuv420p and +faststart are both load-bearing: 10-bit 4:2:2 will not play in
+# browsers, and without faststart the moov atom trails the media so players
+# cannot start until the whole file is fetched.
+REVIEW_PROXY_ENABLED_DEFAULT = True
+REVIEW_PROXY_EXT = ".mp4"
+REVIEW_PROXY_CRF = "18"          # visually near-transparent for review
+REVIEW_PROXY_PRESET = "medium"
+
+# ---------------------------------------------------------------------------
 # CDL / Show LUT status dots (burn-in, next to the top-right timecode)
 # ---------------------------------------------------------------------------
 # Small filled squares (not circles - avoids depending on a font that has a
@@ -1431,6 +1452,70 @@ def bake_sequence(data, output_paths):
             run(cmd, label="Encode QT: %s" % os.path.basename(out_path))
             print("[qt_bake_oiio] Written: %s" % out_path)
 
+        # Web review proxy beside the PRIMARY output only - the editorial drop
+        # wants ProRes and nothing else.
+        if output_paths:
+            write_review_proxy(data, output_paths[0], embed_tc)
+
+
+def review_proxy_path(movie_path):
+    """Path of the h264 review proxy that sits beside a baked QT.
+
+    Pure string derivation, identical to qt_watcher's own helper - the two
+    sides agree by convention rather than the bake having to report back.
+    """
+    return os.path.splitext(movie_path)[0] + REVIEW_PROXY_EXT
+
+
+def write_review_proxy(data, src_movie, embed_tc=None):
+    """Transcode a finished ProRes QT to a small h264 .mp4 for ShotGrid.
+
+    Re-encodes the finished QT rather than re-running the whole frame bake:
+    burn-ins, slate and color are already in the picture, so this is a single
+    cheap pass, and the extra generation of h264 is immaterial for review.
+
+    Never raises - the proxy is an optimisation, and a failure here must not
+    cost the caller a ProRes deliverable that already wrote successfully.
+    Returns the proxy path on success, else None.
+    """
+    if not data.get("review_proxy", REVIEW_PROXY_ENABLED_DEFAULT):
+        print("[qt_bake_oiio] Review proxy: skipped (review_proxy=false)")
+        return None
+
+    dst = review_proxy_path(src_movie)
+    if dst == src_movie:
+        print("[qt_bake_oiio] Review proxy: source is already %s, skipping"
+              % REVIEW_PROXY_EXT)
+        return None
+
+    cmd = [
+        FFMPEG, "-y",
+        "-i", src_movie,
+        "-c:v", "libx264",
+        "-preset", REVIEW_PROXY_PRESET,
+        "-crf", REVIEW_PROXY_CRF,
+        # Browser-playable chroma. 10-bit 4:2:2 will not decode in a web player.
+        "-pix_fmt", "yuv420p",
+        # h264 requires even dimensions; harmless when they already are.
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-movflags", "+faststart",
+        "-r", str(FPS),
+    ]
+    if embed_tc:
+        cmd += ["-timecode", embed_tc]
+    cmd.append(dst)
+
+    try:
+        run(cmd, label="Review proxy (h264): %s" % os.path.basename(dst))
+    except Exception as exc:
+        print("[qt_bake_oiio] WARNING: review proxy failed (%s). The ProRes "
+              "deliverable is unaffected; ShotGrid will fall back to "
+              "uploading it." % exc)
+        return None
+
+    print("[qt_bake_oiio] Written: %s" % dst)
+    return dst
+
 
 def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
     """Re-wrap an existing MOV/MP4 with burn-ins (and optional slate). No OCIO."""
@@ -1512,6 +1597,9 @@ def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
 
             run(cmd, label="Encode QT (movie passthrough): %s" % os.path.basename(out_path))
             print("[qt_bake_oiio] Written: %s" % out_path)
+
+        if output_paths:
+            write_review_proxy(data, output_paths[0], burnin_start_tc)
 
 
 # ---------------------------------------------------------------------------

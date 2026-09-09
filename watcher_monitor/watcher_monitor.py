@@ -1,8 +1,11 @@
 """
 watcher_monitor.py
 
-Small status panel for the qt_watcher LaunchAgent: shows whether it is
-running and lets you start, restart or stop it, with a live tail of the log.
+Status panel for the qt_watcher LaunchAgent: shows whether it is running and
+lets you start, restart or stop it, with a live tail of the log.
+
+Styled from drop_app/theme.py rather than a local palette, so the two apps
+stay in lockstep - change the theme once and both follow.
 
 Runs under Flow Production Tracking Desktop's bundled Python (PySide6), the
 same interpreter drop_app uses - launch via launch_watcher_monitor.command.
@@ -11,25 +14,53 @@ All launchctl work lives in watcher_service.py so it can be tested without a
 display.
 """
 
+import os
 import sys
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
-    QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
+    QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
+    QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
 import watcher_service as svc
 
+# Shared Lumon palette lives with the Review Drop app.
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "drop_app")
+)
+import theme  # noqa: E402
+
 POLL_MS = 3000          # status refresh; launchctl is cheap
 LOG_LINES = 200
 
+# Status colours, kept inside the MDR palette rather than signal-bright RGB:
+# a muted olive, brass and oxblood read as instrument lamps on the pale field.
 DOT = {
-    "running": "#33CC33",
-    "warn":    "#E6C229",
-    "stopped": "#D93025",
+    "running": theme.OLIVE,
+    "warn":    "#8A7A3D",
+    "stopped": "#7A3B34",
 }
+STATE_WORD = {
+    "running": "RUNNING",
+    "warn":    "ATTENTION",
+    "stopped": "STOPPED",
+}
+
+RULE_CSS = "background: %s;" % theme.STRUCTURE_LINE
+READOUT_KEY_CSS = (
+    "color: %s; font-size: 10px; letter-spacing: 2px;" % theme.INK_FAINT
+)
+READOUT_VAL_CSS = "color: %s; font-size: 12px;" % theme.INK
+
+
+def _rule():
+    """A one-pixel sage divider - the partition line."""
+    line = QFrame()
+    line.setFixedHeight(1)
+    line.setStyleSheet(RULE_CSS)
+    return line
 
 
 class MonitorWindow(QMainWindow):
@@ -37,55 +68,128 @@ class MonitorWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("QT Watcher")
-        self.resize(720, 520)
+        self.resize(760, 580)
+        self.setStyleSheet(theme.APP_CSS)
 
         root = QWidget()
         self.setCentralWidget(root)
-        layout = QVBoxLayout(root)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        outer = QVBoxLayout(root)
+        outer.setContentsMargins(34, 28, 34, 28)
+        outer.setSpacing(0)
 
-        # -- Status row ------------------------------------------------------
+        # -- Masthead --------------------------------------------------------
+        brand = QLabel("QT WATCHER")
+        brand.setFont(QFont("", 20, QFont.Bold))
+        brand.setStyleSheet("%s letter-spacing: 5px;" % theme.BRAND_CSS)
+        outer.addWidget(brand)
+
+        subtitle = QLabel("BUFFALO VFX  ·  RENDER MONITORING")
+        subtitle.setStyleSheet(theme.SUBTITLE_CSS)
+        outer.addWidget(subtitle)
+
+        outer.addSpacing(18)
+        outer.addWidget(_rule())
+        outer.addSpacing(22)
+
+        # -- Status ----------------------------------------------------------
         status_row = QHBoxLayout()
-        self.dot = QLabel("*")
-        self.dot.setFont(QFont("", 22))
-        self.status_label = QLabel("checking...")
-        self.status_label.setFont(QFont("", 15, QFont.Bold))
+        status_row.setSpacing(14)
+
+        self.dot = QLabel("●")
+        self.dot.setFont(QFont("", 26))
+        self.dot.setFixedWidth(28)
+        self.dot.setAlignment(Qt.AlignCenter)
         status_row.addWidget(self.dot)
-        status_row.addWidget(self.status_label)
+
+        stack = QVBoxLayout()
+        stack.setSpacing(2)
+        self.status_label = QLabel("CHECKING")
+        self.status_label.setFont(QFont("", 17, QFont.Bold))
+        self.status_label.setStyleSheet(
+            "color: %s; letter-spacing: 3px;" % theme.INK
+        )
+        self.pid_label = QLabel(" ")
+        self.pid_label.setStyleSheet(theme.HINT_CSS)
+        stack.addWidget(self.status_label)
+        stack.addWidget(self.pid_label)
+        status_row.addLayout(stack)
         status_row.addStretch(1)
-        layout.addLayout(status_row)
+        outer.addLayout(status_row)
 
-        self.detail_label = QLabel("")
-        self.detail_label.setStyleSheet("color: #888;")
-        layout.addWidget(self.detail_label)
+        outer.addSpacing(20)
 
-        # -- Buttons ---------------------------------------------------------
+        # -- Readout grid ----------------------------------------------------
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(28)
+        grid.setVerticalSpacing(8)
+        grid.setColumnStretch(2, 1)
+
+        def readout(row, key):
+            k = QLabel(key)
+            k.setStyleSheet(READOUT_KEY_CSS)
+            v = QLabel("—")
+            v.setStyleSheet(READOUT_VAL_CSS)
+            grid.addWidget(k, row, 0, Qt.AlignRight)
+            grid.addWidget(v, row, 1, Qt.AlignLeft)
+            return v
+
+        self.runs_value = readout(0, "RUNS")
+        self.exit_value = readout(1, "LAST EXIT")
+        outer.addLayout(grid)
+
+        outer.addSpacing(22)
+        outer.addWidget(_rule())
+        outer.addSpacing(18)
+
+        # -- Controls --------------------------------------------------------
         btn_row = QHBoxLayout()
-        self.start_btn = QPushButton("Start")
-        self.restart_btn = QPushButton("Restart")
-        self.stop_btn = QPushButton("Stop")
+        btn_row.setSpacing(10)
+        self.start_btn = QPushButton("START")
+        self.restart_btn = QPushButton("RESTART")
+        self.stop_btn = QPushButton("STOP")
+
+        self.start_btn.setStyleSheet(theme.PRIMARY_BUTTON_CSS)
+        self.restart_btn.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
+        self.stop_btn.setStyleSheet(theme.GHOST_BUTTON_CSS)
+
         self.start_btn.clicked.connect(self.on_start)
         self.restart_btn.clicked.connect(self.on_restart)
         self.stop_btn.clicked.connect(self.on_stop)
+
         for b in (self.start_btn, self.restart_btn, self.stop_btn):
-            b.setMinimumHeight(32)
+            b.setMinimumHeight(34)
+            b.setMinimumWidth(112)
+            b.setCursor(Qt.PointingHandCursor)
             btn_row.addWidget(b)
         btn_row.addStretch(1)
-        layout.addLayout(btn_row)
+        outer.addLayout(btn_row)
 
-        # -- Log tail --------------------------------------------------------
-        log_header = QLabel("Log  -  %s" % svc.LOG_PATH)
-        log_header.setStyleSheet("color: #888;")
-        layout.addWidget(log_header)
+        outer.addSpacing(24)
+
+        # -- Log -------------------------------------------------------------
+        log_label = QLabel("LOG")
+        log_label.setStyleSheet(READOUT_KEY_CSS)
+        outer.addWidget(log_label)
+
+        log_path = QLabel(svc.LOG_PATH)
+        log_path.setStyleSheet(theme.HINT_CSS)
+        outer.addWidget(log_path)
+        outer.addSpacing(6)
 
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setFont(QFont("Menlo", 11))
+        self.log_view.setFont(QFont("Menlo", 10))
         self.log_view.setStyleSheet(
-            "background: #1e1e1e; color: #ddd; border: 1px solid #333;"
+            "QPlainTextEdit {"
+            "  background: %s;"
+            "  color: %s;"
+            "  border: 1px solid %s;"
+            "  border-radius: %s;"
+            "  padding: 10px;"
+            "}" % (theme.SURFACE_RAISED, theme.INK_MUTED,
+                   theme.STRUCTURE_LINE, theme.RADIUS_TIGHT)
         )
-        layout.addWidget(self.log_view, 1)
+        outer.addWidget(self.log_view, 1)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
@@ -98,15 +202,20 @@ class MonitorWindow(QMainWindow):
         st = svc.status()
         text, key = svc.summarize(st)
 
-        self.dot.setStyleSheet("color: %s;" % DOT.get(key, "#888"))
-        self.status_label.setText(text)
+        self.dot.setStyleSheet("color: %s;" % DOT.get(key, theme.INK_FAINT))
+        self.status_label.setText(STATE_WORD.get(key, text.upper()))
 
-        bits = []
-        if st["runs"] is not None:
-            bits.append("runs: %s" % st["runs"])
-        if st["last_exit"] is not None:
-            bits.append("last exit: %s" % st["last_exit"])
-        self.detail_label.setText("   ".join(bits) if bits else " ")
+        if st["pid"]:
+            self.pid_label.setText("PID %s" % st["pid"])
+        elif st["loaded"]:
+            self.pid_label.setText(text)
+        else:
+            self.pid_label.setText("service not registered")
+
+        self.runs_value.setText(
+            "—" if st["runs"] is None else str(st["runs"])
+        )
+        self.exit_value.setText(st["last_exit"] or "—")
 
         self.start_btn.setEnabled(not st["loaded"])
         self.stop_btn.setEnabled(st["loaded"])

@@ -398,17 +398,32 @@ def read_pixel_aspect(exr_path):
 
 def read_resolution(exr_path):
     """
-    Read the pixel width/height of an EXR via oiiotool --info.
+    Read the FRAME size of an EXR - the display window, not the data window.
+
+    This distinction is the whole point of the function. `oiiotool --info`
+    prints the DATA window:
+
+        301_001_0010_INH_temp_v003.1001.exr : 1280 x  568, 4 channel, half
+
+    ...but that render's frame is 1280x720; Nuke wrote only the rows that
+    contain non-black pixels (a 2.25 comp inside a 16:9 format, rows 76-643).
+    Framing off 1280x568 forces a 16:9 frame into an 852-tall box - the image
+    fills the width and comes out ~21% too short. `--info -v` reports the
+    real frame on its "full/display size" line, so ask for that.
 
     Returns (width, height) ints, or (None, None) if unreadable.
     """
+    import re
     try:
         result = subprocess.run(
-            [OIIOTOOL, "--info", exr_path],
+            [OIIOTOOL, "--info", "-v", exr_path],
             capture_output=True, text=True
         )
-        # Typical: "<path> :  1920 x 1080, 4 channel, half openexr"
-        import re
+        m = re.search(r"full/display size:\s*(\d+)\s*x\s*(\d+)", result.stdout)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+        # No full/display line (older oiiotool, or a format without one):
+        # fall back to the data window rather than failing outright.
         m = re.search(r"(\d+)\s*x\s*(\d+)", result.stdout)
         if m:
             return int(m.group(1)), int(m.group(2))
@@ -439,18 +454,25 @@ def framing_plan(src_w, src_h, out_w=DELIVERY_WIDTH, out_h=DELIVERY_HEIGHT):
     resolution it falls back to the old fit-and-pad, which needs no
     measurements.
 
-    src_w/src_h must be the size AFTER any de-squeeze, since that is what the
-    resize sees.
+    src_w/src_h must be the DISPLAY window size after any de-squeeze (see
+    read_resolution) - the frame, not the data window.
+
+    Every branch starts with --croptofull, which flattens the data window out
+    to the display window: renders routinely carry a data window smaller than
+    the frame (Nuke writes only the rows with pixels in them) or larger
+    (overscan). Without this the resize is working on a crop, and the missing
+    rows are not real black pixels.
     """
     if not src_w or not src_h:
         return (
-            ["--fit:filter=lanczos3:pad=1", "%dx%d" % (out_w, out_h)],
+            ["--croptofull", "--fit:filter=lanczos3:pad=1", "%dx%d" % (out_w, out_h)],
             "source size unknown — fitting inside %dx%d (may pillarbox)"
             % (out_w, out_h),
         )
 
     scaled_h = int(round(src_h * (float(out_w) / float(src_w))))
-    args = ["--resize:filter=lanczos3", "%dx%d" % (out_w, scaled_h)]
+    args = ["--croptofull",
+            "--resize:filter=lanczos3", "%dx%d" % (out_w, scaled_h)]
 
     if scaled_h > out_h:
         # Taller than the frame: keep the middle.
@@ -863,7 +885,7 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
     w, h = size
 
     if not apply_log_convert and not want_cdl and not apply_lut and not use_display:
-        cmd = [OIIOTOOL, src_exr]
+        cmd = [OIIOTOOL, src_exr, "--croptofull"]
         if desqueeze_to is not None:
             dw, dh = desqueeze_to
             cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
@@ -874,7 +896,7 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
         run(cmd, label="Thumbnail clamp: %s" % os.path.basename(src_exr))
         return
 
-    cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr]
+    cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr, "--croptofull"]
 
     if apply_log_convert:
         cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
@@ -905,7 +927,7 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
 
 def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size):
     """Resize a display-referred still for the slate collage (no color pipe)."""
-    cmd = [OIIOTOOL, src_path]
+    cmd = [OIIOTOOL, src_path, "--croptofull"]
     if desqueeze_to is not None:
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]

@@ -113,6 +113,9 @@ def group_renders(entries):
             "frame_first": frames[0],
             "frame_last": frames[-1],
             "frame_count": len(frames),
+            # Kept so a trimmed range can be checked against what is actually
+            # on disk rather than against first/last alone.
+            "frames": frames,
             "exr_path_pattern": exr_pattern_from_path(g["sample_path"],
                                                       g["sample_seq"]),
         })
@@ -135,9 +138,48 @@ def describe_render(render):
                                       render["frame_count"], gap)
 
 
+def frames_in_range(render, first, last):
+    """The render's frames that fall inside [first, last]."""
+    return [f for f in (render.get("frames") or []) if first <= f <= last]
+
+
+def check_range(render, first, last):
+    """
+    Judge a requested sub-range against what is on disk.
+
+    Returns (problems, notes): problems block the write, notes are worth
+    saying but bake fine. The bake skips missing frames with a warning and
+    only fails outright when NOTHING in the range exists, so that is the one
+    hard stop here.
+    """
+    problems, notes = [], []
+    if first is None or last is None:
+        return ["frame range must be two whole numbers"], notes
+    if first > last:
+        return ["first frame is after last frame"], notes
+
+    have = frames_in_range(render, first, last)
+    if not have:
+        problems.append(
+            "no rendered frames between %d and %d — the bake would have "
+            "nothing to encode" % (first, last)
+        )
+        return problems, notes
+
+    span = last - first + 1
+    if len(have) != span:
+        notes.append("%d of the %d frames in this range are on disk; the bake "
+                     "skips the rest" % (len(have), span))
+    if first < render["frame_first"] or last > render["frame_last"]:
+        notes.append("range reaches outside what was rendered (%d-%d)"
+                     % (render["frame_first"], render["frame_last"]))
+    return problems, notes
+
+
 def build_flag_data(shot, task, step, render, submitted_for, description,
                     episode, scene, project=None, artist=DEFAULT_ARTIST,
-                    user_id=None, cut_in=None, cut_out=None):
+                    user_id=None, cut_in=None, cut_out=None,
+                    frame_first=None, frame_last=None):
     """
     Assemble the flag payload.
 
@@ -166,8 +208,12 @@ def build_flag_data(shot, task, step, render, submitted_for, description,
         "artist": artist or DEFAULT_ARTIST,
         "user_id": user_id,
         "date": datetime.datetime.now().strftime("%Y-%m-%d"),
-        "frame_first": render["frame_first"],
-        "frame_last": render["frame_last"],
+        # Overridable so a re-run can be trimmed to part of the render. The
+        # bake reads the start timecode from the FIRST frame of whatever
+        # range the flag carries, so a trimmed range still burns in the
+        # correct TC rather than the original head's.
+        "frame_first": render["frame_first"] if frame_first is None else frame_first,
+        "frame_last": render["frame_last"] if frame_last is None else frame_last,
         "start_timecode": None,
         "cut_in": cut_in,
         "cut_out": cut_out,

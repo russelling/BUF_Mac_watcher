@@ -19,7 +19,7 @@ import os
 import sys
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIntValidator
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout,
@@ -116,12 +116,41 @@ class ReflagDialog(QDialog):
 
         self.shot_combo.currentIndexChanged.connect(self._on_shot_changed)
         self.task_combo.currentIndexChanged.connect(self._on_task_changed)
-        self.render_combo.currentIndexChanged.connect(self._update_preview)
+        self.render_combo.currentIndexChanged.connect(self._on_render_changed)
 
         form.addRow(self._key("FILTER"), self.filter_edit)
         form.addRow(self._key("SHOT"), self.shot_combo)
         form.addRow(self._key("TASK"), self.task_combo)
         form.addRow(self._key("RANGE"), self.render_combo)
+
+        # Trimmable range. Defaults to the whole render and resets whenever a
+        # different version is picked, so a trim never silently carries over
+        # to a version it was not measured against.
+        frames = QHBoxLayout()
+        frames.setSpacing(8)
+        self.first_edit = QLineEdit()
+        self.last_edit = QLineEdit()
+        for e in (self.first_edit, self.last_edit):
+            e.setValidator(QIntValidator(-9999999, 9999999, self))
+            e.setFixedWidth(84)
+            e.setAlignment(Qt.AlignCenter)
+            e.textChanged.connect(self._update_preview)
+            frames.addWidget(e)
+            if e is self.first_edit:
+                dash = QLabel("–")
+                dash.setStyleSheet("color: %s;" % theme.INK_FAINT)
+                frames.addWidget(dash)
+        self.frames_hint = QLabel(" ")
+        self.frames_hint.setStyleSheet(theme.HINT_CSS)
+        frames.addWidget(self.frames_hint)
+        frames.addStretch(1)
+        self.reset_range_btn = QPushButton("FULL")
+        self.reset_range_btn.setStyleSheet(theme.GHOST_BUTTON_CSS)
+        self.reset_range_btn.setCursor(Qt.PointingHandCursor)
+        self.reset_range_btn.setFixedWidth(64)
+        self.reset_range_btn.clicked.connect(self._reset_range)
+        frames.addWidget(self.reset_range_btn)
+        form.addRow(self._key("FRAMES"), frames)
         form.addRow(self._key("SUBMITTED FOR"), self.submitted_combo)
         form.addRow(self._key("ARTIST"), self.artist_edit)
         form.addRow(self._key("DESCRIPTION"), self.description_edit)
@@ -389,7 +418,48 @@ class ReflagDialog(QDialog):
             self.render_combo.addItem(fb.describe_render(r), r)
         self.render_combo.blockSignals(False)
         self.render_combo.setCurrentIndex(0)   # newest version
+        self._reset_range()                    # also repaints the preview
+
+    # -- Frame range ---------------------------------------------------------
+
+    def _on_render_changed(self, *_):
+        self._reset_range()
+
+    def _reset_range(self):
+        """Put the fields back to the whole render."""
+        render = self.current_render()
+        if not render:
+            self.first_edit.clear()
+            self.last_edit.clear()
+            self.frames_hint.setText(" ")
+            return
+        for edit, value in ((self.first_edit, render["frame_first"]),
+                            (self.last_edit, render["frame_last"])):
+            edit.blockSignals(True)
+            edit.setText(str(value))
+            edit.blockSignals(False)
+        self.frames_hint.setText(
+            "rendered %d–%d" % (render["frame_first"], render["frame_last"])
+        )
         self._update_preview()
+
+    def requested_range(self, render):
+        """
+        (first, last) from the fields, falling back to the whole render.
+
+        A blank or half-typed box means "as rendered" rather than an error -
+        the boxes are edited live and the preview redraws on every keystroke.
+        """
+        def read(edit, default):
+            text = edit.text().strip()
+            if not text or text in ("-", "+"):
+                return default
+            try:
+                return int(text)
+            except ValueError:
+                return None
+        return (read(self.first_edit, render["frame_first"]),
+                read(self.last_edit, render["frame_last"]))
 
     # -- Preview -------------------------------------------------------------
 
@@ -406,18 +476,25 @@ class ReflagDialog(QDialog):
             self._fail("Could not resolve the flag path: %s" % exc)
             return
 
+        first, last = self.requested_range(render)
+        problems, notes = fb.check_range(render, first, last)
+        trimmed = (first, last) != (render["frame_first"], render["frame_last"])
+
+        if problems:
+            frame_line = "Frames:  %s" % "; ".join(problems)
+        elif trimmed:
+            frame_line = ("Frames:  %d–%d  (trimmed from %d–%d, %d frames)"
+                          % (first, last, render["frame_first"],
+                             render["frame_last"],
+                             len(fb.frames_in_range(render, first, last))))
+        else:
+            frame_line = ("Frames:  %d–%d  (%d on disk)"
+                          % (first, last, render["frame_count"]))
+
         lines = ["Flag:  %s" % flag_path,
                  "EXRs:  %s" % render["exr_path_pattern"],
-                 "Frames:  %d–%d  (%d on disk)"
-                 % (render["frame_first"], render["frame_last"],
-                    render["frame_count"])]
-
-        expected = render["frame_last"] - render["frame_first"] + 1
-        if render["frame_count"] != expected:
-            lines.append(
-                "WARNING: %d of %d frames are on disk. The bake will encode "
-                "only what exists." % (render["frame_count"], expected)
-            )
+                 frame_line]
+        lines.extend("Note: %s" % n for n in notes)
 
         # A missing CDL is not an error - plenty of shots have none - but it
         # is the difference between a graded and an ungraded QT, so it is
@@ -448,13 +525,20 @@ class ReflagDialog(QDialog):
                          "and a new Version created in Flow.")
 
         self.preview.setText("\n\n".join(lines))
-        self.write_btn.setEnabled(True)
+        self.write_btn.setEnabled(not problems)
 
     # -- Write ---------------------------------------------------------------
 
     def on_write(self):
         shot, task, render = self.current_shot(), self.current_task(), self.current_render()
         if not (shot and task and render):
+            return
+
+        first, last = self.requested_range(render)
+        range_problems, _ = fb.check_range(render, first, last)
+        if range_problems:
+            QMessageBox.warning(self, "Frame range",
+                                "\n".join("• %s" % p for p in range_problems))
             return
 
         artist = self.artist_edit.text().strip() or fb.DEFAULT_ARTIST
@@ -473,6 +557,8 @@ class ReflagDialog(QDialog):
             user_id=fb.human_user_id(self.tk, artist) or fb.current_user_id(self.tk),
             cut_in=cut_in,
             cut_out=cut_out,
+            frame_first=first,
+            frame_last=last,
         )
 
         problems = fb.validate_flag(data)
@@ -506,8 +592,9 @@ class ReflagDialog(QDialog):
 
         QMessageBox.information(
             self, "Flag written",
-            "%s v%03d is queued.\n\nThe watcher picks it up within 30 seconds; "
-            "watch the log for the bake.\n\n%s%s"
-            % (shot.get("code"), render["version"], flag_path, colour_note),
+            "%s v%03d, frames %d–%d, is queued.\n\nThe watcher picks it up "
+            "within 30 seconds; watch the log for the bake.\n\n%s%s"
+            % (shot.get("code"), render["version"], first, last,
+               flag_path, colour_note),
         )
         self.accept()

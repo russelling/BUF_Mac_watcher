@@ -21,8 +21,8 @@ import sys
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QFormLayout, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout,
+    QApplication, QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout,
 )
 
 import flag_builder as fb
@@ -34,6 +34,26 @@ import theme  # noqa: E402
 
 # A shot list that long is easier to type into than to scroll.
 FILTER_HINT = "type to filter…"
+
+# Colour-source lamps, in the same muted palette the monitor's status dot uses:
+#   ok      the shot's own file will be applied
+#   show    no per-shot LUT; the global show LUT stands in (normal, but say so)
+#   none    nothing found - the QT will be ungraded / off-look
+#   unknown the lookup could not run
+LAMP = {
+    "ok":      theme.OLIVE,
+    "warn":    "#8A7A3D",
+    "show":    "#8A7A3D",
+    "none":    "#7A3B34",
+    "unknown": theme.INK_FAINT,
+}
+LAMP_WORD = {
+    "ok": "FOUND",
+    "warn": "CHECK",
+    "show": "SHOW LUT",
+    "none": "NOT FOUND",
+    "unknown": "UNKNOWN",
+}
 
 
 class ReflagDialog(QDialog):
@@ -51,6 +71,7 @@ class ReflagDialog(QDialog):
         self.tasks = []
         self.renders = []
         self.fields = {}
+        self.colour = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(28, 24, 28, 24)
@@ -106,6 +127,38 @@ class ReflagDialog(QDialog):
         outer.addLayout(form)
 
         outer.addSpacing(16)
+
+        # -- Colour sources --------------------------------------------------
+        # Answered by qt_bake_oiio's own lookups, so what is shown here is
+        # literally what the bake will pick up - see flag_builder.color_sources.
+        colour = QGridLayout()
+        colour.setHorizontalSpacing(10)
+        colour.setVerticalSpacing(4)
+        colour.setColumnStretch(2, 1)
+
+        def lamp_row(row, key):
+            dot = QLabel("●")
+            dot.setFont(QFont("", 13))
+            dot.setFixedWidth(16)
+            dot.setAlignment(Qt.AlignCenter)
+            name = QLabel(key)
+            name.setStyleSheet(
+                "color: %s; font-size: 10px; letter-spacing: 2px;" % theme.INK_FAINT
+            )
+            name.setFixedWidth(44)
+            detail = QLabel("—")
+            detail.setWordWrap(True)
+            detail.setStyleSheet("color: %s; font-size: 11px;" % theme.INK)
+            colour.addWidget(dot, row, 0)
+            colour.addWidget(name, row, 1)
+            colour.addWidget(detail, row, 2)
+            return dot, detail
+
+        self.cdl_dot, self.cdl_detail = lamp_row(0, "CDL")
+        self.lut_dot, self.lut_detail = lamp_row(1, "LUT")
+        outer.addLayout(colour)
+
+        outer.addSpacing(14)
 
         # Everything the write will do, in words, before the button is armed.
         self.preview = QLabel("Connecting to Flow…")
@@ -182,6 +235,34 @@ class ReflagDialog(QDialog):
     def _fail(self, message):
         self.preview.setText(message)
         self.write_btn.setEnabled(False)
+        self._clear_lamps()
+
+    # -- Colour lamps --------------------------------------------------------
+
+    def _clear_lamps(self):
+        self.colour = None
+        for dot, detail in ((self.cdl_dot, self.cdl_detail),
+                            (self.lut_dot, self.lut_detail)):
+            dot.setStyleSheet("color: %s;" % theme.INK_FAINT)
+            detail.setText("—")
+
+    def _refresh_lamps(self):
+        """
+        Ask the bake what it will pick up for this shot.
+
+        Per shot, not per version - the CDL and LUT live in the shot's plates/
+        folder - so this runs when the context changes rather than on every
+        version click.
+        """
+        self.colour = fb.color_sources(fb.color_probe_data(self.fields))
+        for key, dot, detail in (("cdl", self.cdl_dot, self.cdl_detail),
+                                 ("lut", self.lut_dot, self.lut_detail)):
+            entry = self.colour[key]
+            dot.setStyleSheet("color: %s;" % LAMP[entry["status"]])
+            detail.setText("%s   %s" % (LAMP_WORD[entry["status"]],
+                                        entry["detail"]))
+            dot.setToolTip(entry["path"] or entry["detail"])
+            detail.setToolTip(entry["path"] or entry["detail"])
 
     # -- Cascade -------------------------------------------------------------
 
@@ -286,6 +367,8 @@ class ReflagDialog(QDialog):
             )
             return
 
+        self._refresh_lamps()
+
         self.render_combo.blockSignals(True)
         for r in self.renders:
             self.render_combo.addItem(fb.describe_render(r), r)
@@ -320,6 +403,19 @@ class ReflagDialog(QDialog):
                 "WARNING: %d of %d frames are on disk. The bake will encode "
                 "only what exists." % (render["frame_count"], expected)
             )
+
+        # A missing CDL is not an error - plenty of shots have none - but it
+        # is the difference between a graded and an ungraded QT, so it is
+        # said in words here as well as shown on the lamp.
+        colour = getattr(self, "colour", None)
+        if colour:
+            if colour["cdl"]["status"] == "none":
+                lines.append("No CDL for this shot — the QT will bake UNGRADED.")
+            if colour["lut"]["status"] == "none":
+                lines.append(
+                    "No LUT at all — the bake falls back to a generic display "
+                    "transform and the look will not match the show."
+                )
         if os.path.exists(flag_path):
             lines.append(
                 "A flag is already sitting here unprocessed — writing will "
@@ -381,10 +477,15 @@ class ReflagDialog(QDialog):
             QMessageBox.warning(self, "Could not write flag", message)
             return
 
+        colour_note = ""
+        if self.colour:
+            colour_note = "\n\nCDL: %s\nLUT: %s" % (
+                self.cdl_detail.text(), self.lut_detail.text())
+
         QMessageBox.information(
             self, "Flag written",
             "%s v%03d is queued.\n\nThe watcher picks it up within 30 seconds; "
-            "watch the log for the bake.\n\n%s"
-            % (shot.get("code"), render["version"], flag_path),
+            "watch the log for the bake.\n\n%s%s"
+            % (shot.get("code"), render["version"], flag_path, colour_note),
         )
         self.accept()

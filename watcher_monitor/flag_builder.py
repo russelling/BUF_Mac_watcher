@@ -194,6 +194,148 @@ def validate_flag(data):
 
 
 # ---------------------------------------------------------------------------
+# Colour sources (CDL + LUT), answered by the bake itself
+# ---------------------------------------------------------------------------
+
+SCRIPTS_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), os.pardir, "scripts"
+)
+
+
+def _bake_module():
+    """
+    Import qt_bake_oiio.
+
+    The point of this whole section is that the CDL/LUT indicator asks the
+    BAKE where it will look, rather than reimplementing the lookup here. A
+    second copy of that logic would drift the first time the naming
+    convention moves (it already has once, to versioned CDLs) and would then
+    show a green light for a file the bake never picks up.
+
+    qt_bake_oiio imports nothing but the standard library and does no work at
+    import time, so this is cheap and safe.
+    """
+    import sys
+    if SCRIPTS_DIR not in sys.path:
+        sys.path.insert(0, SCRIPTS_DIR)
+    import qt_bake_oiio
+    return qt_bake_oiio
+
+
+def color_probe_data(fields, shot_code=None):
+    """Minimal flag-shaped dict for the lookups - they read only these keys."""
+    return {
+        "type": "shot",
+        "shot_code": shot_code or fields.get("Shot"),
+        "episode": fields.get("Episode"),
+        "scene": fields.get("Scene"),
+        "sequence": fields.get("Sequence"),
+    }
+
+
+def color_sources(data):
+    """
+    What the bake will actually pick up for this shot.
+
+    Returns {"plates_dir", "cdl": {...}, "lut": {...}, "log"} where each of
+    cdl/lut is {"status", "path", "detail"} and status is one of:
+
+        "ok"      a per-shot file was found and will be applied
+        "warn"    found, but the bake had to choose between candidates
+        "show"    (LUT only) no per-shot LUT; the global show LUT applies
+        "none"    nothing found - CDL: bakes UNGRADED;
+                                  LUT: generic display transform, off-look
+        "unknown" the lookup could not run (bake module missing, etc.)
+
+    Never raises: an indicator that throws is worse than one that says it
+    does not know.
+    """
+    import contextlib
+    import io
+
+    result = {
+        "plates_dir": None,
+        "cdl": {"status": "unknown", "path": None, "detail": ""},
+        "lut": {"status": "unknown", "path": None, "detail": ""},
+        "log": "",
+    }
+
+    try:
+        bake = _bake_module()
+    except Exception as exc:
+        detail = "could not import qt_bake_oiio: %s" % exc
+        result["cdl"]["detail"] = detail
+        result["lut"]["detail"] = detail
+        return result
+
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            plates_dir = bake.shot_plates_dir(data)
+            cdl_path = bake.find_shot_cdl(plates_dir, data.get("shot_code", ""))
+            lut_path = bake.resolve_lut_path(data)
+            show_lut = bake.SHOW_LUT_PATH
+            show_lut_exists = os.path.exists(show_lut)
+    except Exception as exc:
+        detail = "lookup failed: %s" % exc
+        result["cdl"]["detail"] = detail
+        result["lut"]["detail"] = detail
+        result["log"] = buf.getvalue()
+        return result
+
+    result["plates_dir"] = plates_dir
+    result["log"] = buf.getvalue().strip()
+
+    if not plates_dir:
+        missing = "no plates folder resolves from this context"
+    elif not os.path.isdir(plates_dir):
+        missing = "no plates folder at %s" % plates_dir
+    else:
+        missing = "nothing in %s" % plates_dir
+
+    # The bake logs when it had to CHOOSE between several candidates - more
+    # than one versioned CDL, more than one LUT in plates/. It still bakes,
+    # so this is not a failure, but "it found something" is the wrong thing
+    # to show when what it found was a guess. Surface the ambiguity.
+    log_lines = result["log"].splitlines()
+    cdl_ambiguous = any("CDL: multiple candidates" in ln for ln in log_lines)
+    lut_ambiguous = any("LUT: WARNING" in ln for ln in log_lines)
+
+    if cdl_path:
+        result["cdl"] = {
+            "status": "warn" if cdl_ambiguous else "ok",
+            "path": cdl_path,
+            "detail": os.path.basename(cdl_path) + (
+                " — several CDLs in plates/, this is the highest version"
+                if cdl_ambiguous else ""),
+        }
+    else:
+        result["cdl"] = {"status": "none", "path": None,
+                         "detail": "%s — bakes UNGRADED" % missing}
+
+    if lut_path and lut_ambiguous:
+        result["lut"] = {
+            "status": "warn", "path": lut_path,
+            "detail": "%s — several LUTs in plates/, this one wins"
+                      % os.path.basename(lut_path),
+        }
+    elif lut_path:
+        result["lut"] = {"status": "ok", "path": lut_path,
+                         "detail": "%s (per-shot)" % os.path.basename(lut_path)}
+    elif show_lut_exists:
+        result["lut"] = {"status": "show", "path": show_lut,
+                         "detail": "%s (show LUT)" % os.path.basename(show_lut)}
+    else:
+        result["lut"] = {
+            "status": "none", "path": None,
+            "detail": "no per-shot LUT and the show LUT is missing — generic "
+                      "display transform, look will differ",
+        }
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # sgtk-backed
 # ---------------------------------------------------------------------------
 

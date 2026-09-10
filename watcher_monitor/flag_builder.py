@@ -400,10 +400,58 @@ def context_fields(tk, task_id, template_name=RENDER_TEMPLATE):
 
     This is the same call Workfiles2 makes, and it leans on the path cache -
     if folders were never registered for the Task, Step (and sometimes more)
-    comes back missing. Callers must check rather than assume.
+    comes back missing. Use resolve_fields() rather than this directly.
     """
     ctx = tk.context_from_entity("Task", task_id)
     return ctx.as_template_fields(tk.templates[template_name])
+
+
+def fields_from_shot_code(code):
+    """
+    Episode and Scene inferred from a shot code, e.g.
+
+        301_001_0010  ->  Episode "301", Scene "301_001"
+
+    matching shots/{Episode}/{Scene}/{Shot} on disk. Last resort only - used
+    when Toolkit's own resolution came back without them.
+    """
+    parts = (code or "").split("_")
+    if len(parts) < 3:
+        return {}
+    return {"Episode": parts[0], "Scene": "%s_%s" % (parts[0], parts[1])}
+
+
+def resolve_fields(tk, shot, task, template_name=RENDER_TEMPLATE):
+    """
+    Template fields for this shot + task, path cache or no path cache.
+
+    Toolkit's own resolution is tried first and trusted where it answers.
+    What it will NOT answer is {Step}: step folders carry
+    `create_with_parent: false`, so `tank Shot <id> folders` never creates
+    them and nothing registers them until someone runs
+    `tank Task <id> folders`. Step is a property of the Task regardless, and
+    we already looked the Step entity up - so take it from there instead of
+    demanding the cache be perfect.
+
+    That matters because the renders themselves are on disk either way (Nuke
+    wrote them), and paths_from_template() globs the disk rather than reading
+    the cache. Nothing here needs the cache to be correct; it only needs the
+    right field values.
+    """
+    fields = {}
+    try:
+        fields = dict(context_fields(tk, task["id"], template_name))
+    except Exception:
+        fields = {}
+
+    if task.get("step"):
+        fields["Step"] = task["step"]
+    if shot.get("code"):
+        fields.setdefault("Shot", shot["code"])
+    for key, value in fields_from_shot_code(shot.get("code")).items():
+        if not fields.get(key):
+            fields[key] = value
+    return fields
 
 
 def find_renders(tk, fields):

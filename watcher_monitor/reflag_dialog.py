@@ -72,6 +72,7 @@ class ReflagDialog(QDialog):
         self.renders = []
         self.fields = {}
         self.colour = None
+        self.stale_cache = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(28, 24, 28, 24)
@@ -120,7 +121,7 @@ class ReflagDialog(QDialog):
         form.addRow(self._key("FILTER"), self.filter_edit)
         form.addRow(self._key("SHOT"), self.shot_combo)
         form.addRow(self._key("TASK"), self.task_combo)
-        form.addRow(self._key("RENDER"), self.render_combo)
+        form.addRow(self._key("RANGE"), self.render_combo)
         form.addRow(self._key("SUBMITTED FOR"), self.submitted_combo)
         form.addRow(self._key("ARTIST"), self.artist_edit)
         form.addRow(self._key("DESCRIPTION"), self.description_edit)
@@ -326,35 +327,49 @@ class ReflagDialog(QDialog):
         self.render_combo.clear()
         self.renders = []
         self.fields = {}
+        self.stale_cache = False
         self.render_combo.blockSignals(False)
 
+        shot = self.current_shot()
         task = self.current_task()
         if not task:
             self._fail("This shot has no tasks.")
             return
 
         try:
-            self.fields = fb.context_fields(self.tk, task["id"])
+            self.fields = fb.resolve_fields(self.tk, shot, task)
         except Exception as exc:
-            self._fail(
-                "Toolkit could not resolve this task's folders:\n\n%s\n\n"
-                "That usually means folders were never registered for it. "
-                "Run:  tank Task %s folders" % (exc, task["id"])
-            )
+            self._fail("Could not resolve this task: %s" % exc)
             return
 
         missing = [k for k in ("Episode", "Scene", "Shot", "Step")
                    if not self.fields.get(k)]
         if missing:
+            hint = ""
+            if "Step" in missing:
+                hint = ("\n\nStep comes from the Task's pipeline step — this "
+                        "Task appears to have none assigned in Flow.")
             self._fail(
-                "Missing template fields for this task: %s\n\n"
-                "The path cache has no folders registered for it. Run:\n"
-                "  tank Task %s folders" % (", ".join(missing), task["id"])
+                "Cannot resolve template fields for this task: %s%s"
+                % (", ".join(missing), hint)
             )
             return
 
         try:
             self.renders = fb.find_renders(self.tk, self.fields)
+            if not self.renders:
+                # Nothing found can also mean Toolkit handed us a STALE
+                # Episode/Scene - this show's path cache still carries
+                # pre-renumber values for some shots (shots/301/001/... where
+                # disk says shots/301/301_001/...). Retry with the values the
+                # shot code implies and keep whichever actually finds frames.
+                alt = dict(self.fields)
+                alt.update(fb.fields_from_shot_code(shot.get("code")))
+                if alt != self.fields:
+                    alt_renders = fb.find_renders(self.tk, alt)
+                    if alt_renders:
+                        self.fields, self.renders = alt, alt_renders
+                        self.stale_cache = True
         except Exception as exc:
             self._fail("Could not scan renders: %s" % exc)
             return
@@ -407,6 +422,13 @@ class ReflagDialog(QDialog):
         # A missing CDL is not an error - plenty of shots have none - but it
         # is the difference between a graded and an ungraded QT, so it is
         # said in words here as well as shown on the lamp.
+        if self.stale_cache:
+            lines.append(
+                "Note: Toolkit's registered path for this task did not match "
+                "disk; using the location the shot code implies. The path "
+                "cache for this shot is stale."
+            )
+
         colour = getattr(self, "colour", None)
         if colour:
             if colour["cdl"]["status"] == "none":

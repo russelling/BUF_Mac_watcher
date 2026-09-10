@@ -942,7 +942,8 @@ def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size):
 # ---------------------------------------------------------------------------
 
 def build_drawtext_filters(data, frame_offset, start_tc,
-                            cdl_status=None, lut_status=None):
+                            cdl_status=None, lut_status=None,
+                            mask_first_frame=0):
     """
     Build FFmpeg drawtext filter chain for burn-ins (and the framing mask).
 
@@ -957,6 +958,11 @@ def build_drawtext_filters(data, frame_offset, start_tc,
                    compute_indicator_statuses(). Rendered as small status
                    dots directly below the timecode burn-in; None omits the
                    corresponding dot entirely.
+    mask_first_frame : 0-based output frame index where the framing mask
+                   starts. Pass 1 when a slate is prepended: the slate is a
+                   built graphic, not a camera frame, and masking it to 2.39
+                   just chops its own layout. The picture frames still get
+                   the mask from the first one (1001) onward.
     """
     is_shot = is_shot_context(data)
 
@@ -1006,10 +1012,17 @@ def build_drawtext_filters(data, frame_offset, start_tc,
             # (ih - iw/ratio)/2 per bar. Evaluated by ffmpeg against the real
             # frame size, so this is resolution-independent.
             bar = "(ih-iw/%.6f)/2" % ratio
+            # Skip the slate: drawbox supports timeline editing, so gate it on
+            # the output frame index rather than encoding the slate separately.
+            # Quoted because the expression contains a comma, which would
+            # otherwise read as the start of the next filter.
+            gate = ""
+            if mask_first_frame > 0:
+                gate = ":enable='gte(n\\,%d)'" % mask_first_frame
             for y in ("0", "ih-%s" % bar):
                 filters.append(
-                    "drawbox=x=0:y=%s:w=iw:h=%s:color=black@%.3f:t=fill"
-                    % (y, bar, opacity)
+                    "drawbox=x=0:y=%s:w=iw:h=%s:color=black@%.3f:t=fill%s"
+                    % (y, bar, opacity, gate)
                 )
 
     # Upper left
@@ -1510,6 +1523,9 @@ def bake_sequence(data, output_paths):
         burnin_filters = build_drawtext_filters(
             data, burnin_offset, burnin_start_tc,
             cdl_status=cdl_status, lut_status=lut_status,
+            # Slate sits at output index 0; the mask starts on the first
+            # picture frame after it.
+            mask_first_frame=1 if slate_path else 0,
         )
         embed_tc = burnin_start_tc
 
@@ -1644,7 +1660,10 @@ def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
             burnin_offset = first
             burnin_start_tc = start_tc
 
-        burnin_filters = build_drawtext_filters(data, burnin_offset, burnin_start_tc)
+        burnin_filters = build_drawtext_filters(
+            data, burnin_offset, burnin_start_tc,
+            mask_first_frame=1 if slate_path else 0,
+        )
         vf = "%s,%s" % (fit, burnin_filters)
 
         for out_path in output_paths:

@@ -23,5 +23,22 @@ if [ ! -x "$SG_PYTHON" ]; then
   pause_exit
 fi
 
-# No sgtk needed - this panel only talks to launchctl and reads the log.
+# The service controls and log tail need nothing but launchctl. The RE-RUN QT
+# button needs Toolkit, which arrives on PYTHONPATH exactly the way
+# install_qt_watcher.sh gives it to the watcher itself - same interpreter, same
+# tk-core, so the panel and the daemon can never disagree about the config.
+#
+# Missing tk-core is not fatal: the panel still starts, and only that one
+# button reports the problem.
+STORAGE_ROOT="${STORAGE_ROOT:-/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx}"
+CONFIG_ROOT="${CONFIG_ROOT:-$STORAGE_ROOT/repo/pipeline/config/flow/current}"
+TK_CORE_PY="$CONFIG_ROOT/install/core/python"
+
+if [ -d "$TK_CORE_PY" ]; then
+  export PYTHONPATH="$TK_CORE_PY${PYTHONPATH:+:$PYTHONPATH}"
+else
+  echo "NOTE: tk-core not found at $TK_CORE_PY"
+  echo "      The panel will run, but RE-RUN QT will be unavailable."
+fi
+
 exec "$SG_PYTHON" "$APP_DIR/watcher_monitor.py"

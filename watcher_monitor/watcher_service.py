@@ -59,6 +59,13 @@ def parse_print_output(text):
     if "Could not find service" in text or "No such process" in text:
         return result
 
+    # Only a real print block counts as loaded. Without this, ANY unexpected
+    # output - launchctl missing, a permissions error, a wedged domain - would
+    # read as "loaded", and the panel would claim a service is registered on
+    # the strength of an error message.
+    if not re.search(r"^\s*(state|path|program|pid)\s*=", text, re.MULTILINE):
+        return result
+
     result["loaded"] = True
 
     # Capture the whole value: states like "not running" contain a space.

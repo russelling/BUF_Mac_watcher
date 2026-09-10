@@ -191,21 +191,30 @@ class MonitorWindow(QMainWindow):
         self.start_btn = QPushButton("START")
         self.restart_btn = QPushButton("RESTART")
         self.stop_btn = QPushButton("STOP")
+        self.reflag_btn = QPushButton("RE-RUN QT")
 
         self.start_btn.setStyleSheet(theme.PRIMARY_BUTTON_CSS)
         self.restart_btn.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
         self.stop_btn.setStyleSheet(theme.GHOST_BUTTON_CSS)
+        self.reflag_btn.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
 
         self.start_btn.clicked.connect(self.on_start)
         self.restart_btn.clicked.connect(self.on_restart)
         self.stop_btn.clicked.connect(self.on_stop)
+        self.reflag_btn.clicked.connect(self.on_reflag)
 
         for b in (self.start_btn, self.restart_btn, self.stop_btn):
             b.setMinimumHeight(34)
             b.setMinimumWidth(112)
             b.setCursor(Qt.PointingHandCursor)
             btn_row.addWidget(b)
+        # Separated from the service controls: this one queues work rather
+        # than changing the state of the daemon.
         btn_row.addStretch(1)
+        self.reflag_btn.setMinimumHeight(34)
+        self.reflag_btn.setMinimumWidth(120)
+        self.reflag_btn.setCursor(Qt.PointingHandCursor)
+        btn_row.addWidget(self.reflag_btn)
         outer.addLayout(btn_row)
 
         outer.addSpacing(24)
@@ -300,6 +309,28 @@ class MonitorWindow(QMainWindow):
 
     def on_stop(self):
         self._act(svc.stop, "Stop")
+
+    def on_reflag(self):
+        """
+        Queue a shot render for a fresh bake.
+
+        The dialog is imported here rather than at module scope so a missing
+        or broken sgtk only breaks this button - the service controls and the
+        log tail, which are the point of this panel, keep working.
+        """
+        try:
+            from reflag_dialog import ReflagDialog
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "Re-run QT unavailable",
+                "Could not load the flag builder:\n\n%s: %s\n\n"
+                "It needs Toolkit (sgtk) on PYTHONPATH - see "
+                "launch_watcher_monitor.command." % (type(exc).__name__, exc),
+            )
+            return
+        dlg = ReflagDialog(self)
+        if dlg.exec():
+            self.refresh()
 
 
 def main():

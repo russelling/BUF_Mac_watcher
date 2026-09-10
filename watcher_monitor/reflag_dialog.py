@@ -121,7 +121,7 @@ class ReflagDialog(QDialog):
         form.addRow(self._key("FILTER"), self.filter_edit)
         form.addRow(self._key("SHOT"), self.shot_combo)
         form.addRow(self._key("TASK"), self.task_combo)
-        form.addRow(self._key("RANGE"), self.render_combo)
+        form.addRow(self._key("RENDER"), self.render_combo)
 
         # Trimmable range. Defaults to the whole render and resets whenever a
         # different version is picked, so a trim never silently carries over

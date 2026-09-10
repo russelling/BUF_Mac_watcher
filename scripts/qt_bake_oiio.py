@@ -114,8 +114,10 @@ OCIO_REC709_VIEW    = "ACES 2.0 - SDR 100 nits (Rec.709)"
 
 FPS = 24
 
-# Fixed final delivery size for ALL QTs. Every output is letterboxed/
-# pillarboxed to exactly this, regardless of source resolution or squeeze.
+# Fixed final delivery size for ALL QTs. Every output is exactly this size
+# regardless of source resolution or squeeze: the image is scaled to fill the
+# WIDTH and then centre cropped (taller sources) or letterboxed (wider ones).
+# See framing_plan().
 DELIVERY_WIDTH = 1920
 DELIVERY_HEIGHT = 1080
 
@@ -148,8 +150,8 @@ REVIEW_PROXY_PRESET = "medium"
 # as the timecode, directly below it. Deliberately subtle: ~8px, muted
 # colors, a thin dark outline so they read against any footage without
 # shouting over the shot. Positions are computed from the fixed
-# DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to that size) rather than
-# ffmpeg's runtime w/h expressions, since dot size never changes per-frame.
+# DELIVERY_WIDTH/HEIGHT (every QT is that size) rather than ffmpeg's runtime
+# w/h expressions, since dot size never changes per-frame.
 STATUS_DOT_SIZE = 8
 STATUS_DOT_GAP = 5          # horizontal gap between the two dots
 STATUS_DOT_Y_GAP = 10       # vertical gap between the TC row and the dot row
@@ -415,6 +417,65 @@ def read_resolution(exr_path):
     return (None, None)
 
 
+def framing_plan(src_w, src_h, out_w=DELIVERY_WIDTH, out_h=DELIVERY_HEIGHT):
+    """
+    oiiotool args that make the image FILL THE FRAME HORIZONTALLY, centred.
+
+    The image is scaled so its width is exactly out_w, then:
+      - taller than the frame  -> centre CROPPED top and bottom
+      - wider than the frame   -> centred with black bars top and bottom
+
+    So a 4:3, 1.85 or square render fills 1920 edge to edge instead of
+    sitting in pillarbox bars, and a 2.39 render still shows its whole width
+    with letterbox above and below. Sides are never cropped: losing the
+    edges of a scope frame would hide exactly what review is looking for.
+
+    This replaces `--fit:pad=1`, which fit the image INSIDE the frame and so
+    pillarboxed anything narrower than 16:9.
+
+    Returns (args, description). Geometry is computed once per sequence, from
+    the first frame - the same single-frame assumption the anamorphic
+    de-squeeze already makes (one sequence, one format). With no readable
+    resolution it falls back to the old fit-and-pad, which needs no
+    measurements.
+
+    src_w/src_h must be the size AFTER any de-squeeze, since that is what the
+    resize sees.
+    """
+    if not src_w or not src_h:
+        return (
+            ["--fit:filter=lanczos3:pad=1", "%dx%d" % (out_w, out_h)],
+            "source size unknown — fitting inside %dx%d (may pillarbox)"
+            % (out_w, out_h),
+        )
+
+    scaled_h = int(round(src_h * (float(out_w) / float(src_w))))
+    args = ["--resize:filter=lanczos3", "%dx%d" % (out_w, scaled_h)]
+
+    if scaled_h > out_h:
+        # Taller than the frame: keep the middle.
+        y = (scaled_h - out_h) // 2
+        args += ["--cut", "%dx%d+0+%d" % (out_w, out_h, y)]
+        note = ("%dx%d -> %dx%d, centre crop %dpx off top and bottom"
+                % (src_w, src_h, out_w, out_h, y))
+    elif scaled_h < out_h:
+        # Wider than the frame: centre it and letterbox. Done by moving the
+        # data window and then flattening to the display window, so the
+        # pixels are resampled exactly once.
+        y = (out_h - scaled_h) // 2
+        args += [
+            "--origin", "+0+%d" % y,
+            "--fullsize", "%dx%d+0+0" % (out_w, out_h),
+            "--croptofull",
+        ]
+        note = ("%dx%d -> %dx%d, letterboxed with %dpx bars top and bottom"
+                % (src_w, src_h, out_w, out_h, y))
+    else:
+        note = "%dx%d -> %dx%d, exact fit" % (src_w, src_h, out_w, out_h)
+
+    return args, note
+
+
 def resolve_start_timecode(data, exr_pattern, first):
     """
     Determine the source start timecode, in priority order:
@@ -677,7 +738,7 @@ def color_pipe_stages(data, skip_color=False):
 
 
 def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
-               desqueeze_to=None, fit_to=None, apply_log_convert=True,
+               desqueeze_to=None, frame_args=None, apply_log_convert=True,
                apply_cdl=True, apply_lut_stage=True):
     """
     Apply the show color pipeline to a single EXR frame using oiiotool:
@@ -695,7 +756,10 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
                        still shown if log convert is on.
     apply_log_convert / apply_cdl / apply_lut_stage : per-stage enables from
                        color_pipe.
-    desqueeze_to / fit_to : geometry (see prior docstring).
+    desqueeze_to    : (w, h) anamorphic de-squeeze, or None.
+    frame_args      : oiiotool args that place the image in the delivery
+                       frame, from framing_plan() - computed once per
+                       sequence rather than per frame.
 
     Output is an 8-bit PNG suitable for ffmpeg input.
     """
@@ -712,9 +776,8 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
         if desqueeze_to is not None:
             dw, dh = desqueeze_to
             cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
-        if fit_to is not None:
-            fw, fh = fit_to
-            cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+        if frame_args:
+            cmd += list(frame_args)
         cmd += ["--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
         run(cmd, label="Raw clamp: %s" % os.path.basename(src_exr))
         return
@@ -749,11 +812,10 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
 
-    # Step 5: fit/letterbox to the fixed delivery size. pad=1 forces the
-    # output to be EXACTLY fit_to with black bars, preserving aspect.
-    if fit_to is not None:
-        fw, fh = fit_to
-        cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+    # Step 5: place in the delivery frame - fill the width, centre crop or
+    # letterbox the height. See framing_plan().
+    if frame_args:
+        cmd += list(frame_args)
 
     # Clamp, convert to 8-bit, output PNG.
     # NOTE: --clamp takes min=/max= as colon-appended MODIFIERS, not
@@ -764,7 +826,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
     run(cmd, label="Color bake: %s" % os.path.basename(src_exr))
 
 
-def passthrough_frame(src_path, dst_png, desqueeze_to=None, fit_to=None):
+def passthrough_frame(src_path, dst_png, desqueeze_to=None, frame_args=None):
     """
     Convert a display-referred still (PNG/JPG/TIFF/…) to an 8-bit PNG for
     FFmpeg without the ACEScg show color pipe. Used when skip_color is set.
@@ -773,9 +835,8 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, fit_to=None):
     if desqueeze_to is not None:
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
-    if fit_to is not None:
-        fw, fh = fit_to
-        cmd += ["--fit:filter=lanczos3:pad=1", "%dx%d" % (fw, fh)]
+    if frame_args:
+        cmd += list(frame_args)
     cmd += ["--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
     run(cmd, label="Passthrough: %s" % os.path.basename(src_path))
 
@@ -969,7 +1030,7 @@ def build_drawtext_filters(data, frame_offset, start_tc,
 
     # CDL / Show LUT status dots: a subtle row of small colored squares
     # right-aligned to the same margin as the timecode. Fixed pixel math off
-    # DELIVERY_WIDTH/HEIGHT (every QT is letterboxed to that size) rather
+    # DELIVERY_WIDTH/HEIGHT (every QT is that size) rather
     # than ffmpeg's dynamic tw/th, since the dots are a constant size
     # regardless of what text renders alongside them. Order is pipeline
     # order [cdl, lut], rendered right-to-left so the LUT dot (or whichever
@@ -1321,8 +1382,8 @@ def bake_sequence(data, output_paths):
     # Anamorphic de-squeeze + fixed delivery size. Read the pixel aspect
     # ratio and resolution ONCE from the first frame (a sequence shares one
     # PAR). If PAR != 1.0, de-squeeze by reducing height (new_height =
-    # height / PAR), keeping width. Then EVERY frame is letterboxed to the
-    # fixed DELIVERY_WIDTH x DELIVERY_HEIGHT, so all QTs are 1920x1080
+    # height / PAR), keeping width. Then EVERY frame is placed in the fixed
+    # DELIVERY_WIDTH x DELIVERY_HEIGHT frame, so all QTs are 1920x1080
     # regardless of source resolution. The slate is always delivery size too.
     first_exr = frame_path(exr_pattern, first)
     src_w, src_h = read_resolution(first_exr)
@@ -1340,10 +1401,16 @@ def bake_sequence(data, output_paths):
     else:
         print("[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze")
 
-    # All QTs deliver at this fixed size, letterboxed.
-    fit_to = (DELIVERY_WIDTH, DELIVERY_HEIGHT)
+    # All QTs deliver at this fixed size, filling it horizontally. The
+    # geometry is decided once here (from the first frame, post-de-squeeze)
+    # and the same oiiotool args are reused for every frame, so the whole
+    # sequence is framed identically.
     out_w, out_h = DELIVERY_WIDTH, DELIVERY_HEIGHT
-    print("[qt_bake_oiio] Delivery: letterboxing to %dx%d" % (out_w, out_h))
+    frame_src_w, frame_src_h = desqueeze_to if desqueeze_to else (src_w, src_h)
+    frame_args, framing_note = framing_plan(
+        frame_src_w, frame_src_h, out_w, out_h
+    )
+    print("[qt_bake_oiio] Delivery: %s" % framing_note)
 
     with tempfile.TemporaryDirectory(prefix="qt_bake_") as tmpdir:
         print("[qt_bake_oiio] Working in temp dir: %s" % tmpdir)
@@ -1358,12 +1425,12 @@ def bake_sequence(data, output_paths):
             dst = os.path.join(tmpdir, "frame_%04d.png" % frame_num)
             if skip_color:
                 passthrough_frame(
-                    src, dst, desqueeze_to=desqueeze_to, fit_to=fit_to,
+                    src, dst, desqueeze_to=desqueeze_to, frame_args=frame_args,
                 )
             else:
                 bake_frame(
                     src, dst, cdl_path=cdl_path, lut_path=lut_path,
-                    desqueeze_to=desqueeze_to, fit_to=fit_to,
+                    desqueeze_to=desqueeze_to, frame_args=frame_args,
                     apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
                     apply_lut_stage=apply_lut_stage,
                 )

@@ -70,9 +70,54 @@ import tempfile
 # Configuration
 # ---------------------------------------------------------------------------
 
-SHOW_LUT_PATH = (
-    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/LUT/"
-    "260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube"
+# ---------------------------------------------------------------------------
+# Show LUT (the fallback when a shot has no LUT of its own)
+# ---------------------------------------------------------------------------
+# Resolution order, most specific first:
+#
+#   1. flag["show_lut_path"]  - an explicit path resolved upstream. This is the
+#      contract to prefer: whoever writes the flag runs inside a Toolkit
+#      context and can resolve the config's own template, while this script
+#      runs headless outside one. Nothing writes it yet - the Nuke hook needs
+#      a matching change in FlowTrackingConfig - but it is honoured the day it
+#      appears.
+#   2. flag["camera"]         - mapped through SHOW_LUTS_BY_CAMERA below.
+#   3. SHOW_LUT_PATH          - the default, ARRI.
+#
+# NOTE (2026-09-11): the old value pointed at
+#   shots/_globals/LUT/260629/s3LUT/ARRILogC4_SEV_S3_V3_digital_p1s_R709.cube
+# which does not exist - the folder is "luts" (lowercase, plural) and that V3
+# package has since been moved under luts/OLD/. So this fallback has been
+# missing on every bake, and any shot without its own LUT fell through to the
+# generic display transform instead of the show look. Now points at the V4
+# package.
+SHOW_LUT_DIR = (
+    "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/luts"
+)
+
+# Camera -> show LUT. Keys are matched case-insensitively against the flag's
+# "camera" value, and any of the aliases hits the same entry, so "ALEXA 35",
+# "arri" and "alexa35" all resolve.
+#
+# Only cameras with a LUT actually on the share are listed. A camera that is
+# not in this map logs loudly and falls back to SHOW_LUT_PATH rather than
+# silently baking the wrong look.
+#
+# GAP: the Nikon ZR has no LUT in the package (nuke/init.py registers a film
+# back for it, so it is expected on the show). Add it here once the colourist
+# delivers one - until then a ZR render bakes through the ARRI LUT, which is
+# WRONG, and says so in the log.
+SHOW_LUTS_BY_CAMERA = {
+    ("arri", "alexa", "alexa35", "alexa 35", "logc4", "arrilogc4"):
+        "Buffalo_V4_LUT_20260720/ARRILogC4_SEV_S3_V4_R709.cube",
+    ("red", "log3g10", "redlog3g10"):
+        "Buffalo_V4_LUT_20260720/REDLog3G10RWG_SEV_S3_V4_R709.cube",
+    ("sony", "venice", "slog3", "sonyslog3"):
+        "Slog3SG3CV_gm5_SEV_S3_V4_R709.cube",
+}
+
+SHOW_LUT_PATH = os.path.join(
+    SHOW_LUT_DIR, "Buffalo_V4_LUT_20260720/ARRILogC4_SEV_S3_V4_R709.cube"
 )
 LOGO_PATH = (
     "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots/_globals/logo/teardrop_blk1.png"
@@ -666,6 +711,31 @@ def cdl_as_cc(cdl_path, tmpdir):
           % (chosen.get("id") or "correction", os.path.basename(cdl_path),
              out_path))
     return out_path
+
+
+def resolve_show_lut(data):
+    """The show LUT for this flag: explicit path, else by camera, else ARRI.
+
+    Returns (path, reason) where reason is a short phrase for the log. The
+    path may not exist - the caller checks, and falls back to the generic
+    display transform if it is missing.
+    """
+    explicit = data.get("show_lut_path")
+    if explicit:
+        return str(explicit), "from the flag's show_lut_path"
+
+    camera = str(data.get("camera") or "").strip().lower()
+    if camera:
+        for aliases, relative in SHOW_LUTS_BY_CAMERA.items():
+            if camera in aliases:
+                return (os.path.join(SHOW_LUT_DIR, relative),
+                        "for camera '%s'" % camera)
+        print(
+            "[qt_bake_oiio] LUT: camera '%s' has no show LUT in "
+            "SHOW_LUTS_BY_CAMERA %s — using the ARRI default, WHICH MAY BE "
+            "THE WRONG LOOK" % (camera, sorted(a[0] for a in SHOW_LUTS_BY_CAMERA))
+        )
+    return SHOW_LUT_PATH, "default (ARRI)"
 
 
 def shot_plates_dir(data):
@@ -1568,16 +1638,19 @@ def bake_sequence(data, output_paths):
         lut_path = None
     else:
         lut_path = resolve_lut_path(data)
-        if lut_path is None and os.path.exists(SHOW_LUT_PATH):
-            lut_path = SHOW_LUT_PATH
-            print("[qt_bake_oiio] LUT: falling back to show LUT %s" % SHOW_LUT_PATH)
-        elif lut_path is None:
-            print(
-                "[qt_bake_oiio] LUT: no per-shot LUT and show LUT NOT FOUND at %s "
-                "— falling back to display transform '%s' / '%s'. Look will "
-                "differ from final show look."
-                % (SHOW_LUT_PATH, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
-            )
+        if lut_path is None:
+            show_lut, why = resolve_show_lut(data)
+            if os.path.exists(show_lut):
+                lut_path = show_lut
+                print("[qt_bake_oiio] LUT: falling back to show LUT %s (%s)"
+                      % (show_lut, why))
+            else:
+                print(
+                    "[qt_bake_oiio] LUT: no per-shot LUT and show LUT NOT FOUND "
+                    "at %s (%s) — falling back to display transform '%s' / '%s'. "
+                    "Look will differ from final show look."
+                    % (show_lut, why, OCIO_REC709_DISPLAY, OCIO_REC709_VIEW)
+                )
         if not apply_lut_stage:
             print("[qt_bake_oiio] LUT: stage disabled (color_pipe.show_lut=false)")
 

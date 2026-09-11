@@ -534,6 +534,139 @@ SHOTS_ROOT = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots"
 # can represent the whole grade.
 LUT_EXTENSIONS = (".cube", ".lut")
 
+# Accepted CDL extensions, in PRIORITY order.
+#   .ccc - ColorCorrectionCollection, what Resolve delivers today, one per
+#          plate element and living in that element's folder.
+#   .cdl - ColorDecisionList, older deliveries.
+#   .cc  - a bare ColorCorrection, the oldest convention here.
+# NOTE: OCIO will not load a .ccc or a .cdl without a cccid ("You must specify
+# a valid cccid to load from the ccc file"), and oiiotool's
+# --ociofiletransform has no way to pass one. Only a bare .cc loads directly,
+# so cdl_as_cc() below extracts the correction into one. Both of those formats
+# were silently ignored before - every shot delivered this way baked UNGRADED.
+CDL_EXTENSIONS = (".ccc", ".cdl", ".cc")
+
+# Grades and LUTs are delivered per plate element, in that element's folder:
+#
+#     plates/301_017_0010_BG01/301_017_0010_BG01.ccc
+#     plates/301_017_0010_BG01/301_017_0010_BG01.cube
+#
+# A shot can carry several elements (BG01, BG02, BC01...BC05). The main plate
+# is the BG, and its grade is the shot's grade, so elements beginning "bg"
+# sort first and the lowest-numbered wins. Older shots keep these loose in
+# plates/ instead; both layouts are searched, element folders first.
+ELEMENT_PRIORITY_PREFIX = "bg"
+
+
+def _element_dirs(plates_dir, shot_code):
+    """Plate element folders under plates/, best candidate first.
+
+    Ordered BG before anything else, then by name, so BG01 beats BG02 beats
+    BC01. Folders that do not start with the shot code are still included
+    (last) rather than dropped - a vendor folder named differently is better
+    than no grade at all.
+    """
+    try:
+        names = sorted(os.listdir(plates_dir))
+    except OSError:
+        return []
+
+    prefix = ("%s_" % shot_code).lower() if shot_code else ""
+
+    def sort_key(name):
+        lowered = name.lower()
+        element = lowered[len(prefix):] if prefix and lowered.startswith(prefix) else ""
+        if not element:
+            return (2, lowered)
+        return (0 if element.startswith(ELEMENT_PRIORITY_PREFIX) else 1, element)
+
+    dirs = [n for n in names
+            if not n.startswith(".") and os.path.isdir(os.path.join(plates_dir, n))]
+    dirs.sort(key=sort_key)
+    return [os.path.join(plates_dir, n) for n in dirs]
+
+
+def _first_with_extension(directory, extensions):
+    """First file in a directory matching these extensions, in their order."""
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return None
+    for ext in extensions:
+        for name in names:
+            if name.startswith(".") or name.startswith("._"):
+                continue
+            if name.lower().endswith(ext):
+                return os.path.join(directory, name)
+    return None
+
+
+def cdl_as_cc(cdl_path, tmpdir):
+    """Return a grade file OCIO can actually load.
+
+    A bare .cc loads as-is. A .ccc or .cdl does NOT - OCIO demands a cccid
+    that oiiotool cannot pass - so the ColorCorrection inside it is written
+    out as a standalone .cc in tmpdir and that is used instead.
+
+    When a collection holds more than one correction, every id is logged and
+    the one whose id matches the file's own name is preferred (that is how
+    Resolve names them), falling back to the first.
+
+    Returns a path, or None if the file could not be parsed - in which case
+    the caller bakes ungraded rather than failing the whole QT.
+    """
+    if not cdl_path:
+        return None
+    if cdl_path.lower().endswith(".cc"):
+        return cdl_path
+
+    import xml.etree.ElementTree as ET
+
+    try:
+        tree = ET.parse(cdl_path)
+    except Exception as exc:
+        print("[qt_bake_oiio] CDL: could not parse %s: %s — baking UNGRADED"
+              % (cdl_path, exc))
+        return None
+
+    # The files carry xmlns="urn:ASC:CDL:v1.01", so match on the local name.
+    corrections = [el for el in tree.iter()
+                   if el.tag.rsplit("}", 1)[-1] == "ColorCorrection"]
+    if not corrections:
+        print("[qt_bake_oiio] CDL: no ColorCorrection in %s — baking UNGRADED"
+              % cdl_path)
+        return None
+
+    stem = os.path.splitext(os.path.basename(cdl_path))[0]
+    chosen = corrections[0]
+    if len(corrections) > 1:
+        ids = [el.get("id") or "(no id)" for el in corrections]
+        match = next((el for el in corrections if (el.get("id") or "") == stem), None)
+        if match is not None:
+            chosen = match
+        print("[qt_bake_oiio] CDL: %d corrections in %s: %s — using %s"
+              % (len(corrections), os.path.basename(cdl_path), ids,
+                 chosen.get("id") or "the first"))
+
+    # Strip namespaces: OCIO reads a plain <ColorCorrection> document, and a
+    # namespaced one round-trips as ns0: prefixes it will not match.
+    for el in chosen.iter():
+        el.tag = el.tag.rsplit("}", 1)[-1]
+
+    out_path = os.path.join(tmpdir, "%s.cc" % stem)
+    try:
+        ET.ElementTree(chosen).write(out_path, encoding="utf-8",
+                                     xml_declaration=True)
+    except Exception as exc:
+        print("[qt_bake_oiio] CDL: could not write %s: %s — baking UNGRADED"
+              % (out_path, exc))
+        return None
+
+    print("[qt_bake_oiio] CDL: extracted %s from %s -> %s"
+          % (chosen.get("id") or "correction", os.path.basename(cdl_path),
+             out_path))
+    return out_path
+
 
 def shot_plates_dir(data):
     """Absolute path to a shot's plates/ folder, or None for non-shot context.
@@ -556,15 +689,20 @@ def shot_plates_dir(data):
 def resolve_lut_path(data):
     """Find this shot's own LUT in its plates/ folder.
 
-    Per-shot LUTs live beside the plates and are named after the plate,
-    with either a .cube or a .lut extension, e.g.
+    Current deliveries put it in the plate element's own folder:
+
+        plates/301_017_0010_BG01/301_017_0010_BG01.cube
+
+    Older ones leave it loose in plates/, named after the plate:
 
         plates/301_001_0050.####.exr  ->  plates/301_001_0050.cube
                                      or   plates/301_001_0050.lut
 
     Resolution order (extensions tried in LUT_EXTENSIONS priority order,
     .cube before .lut; matching is case-insensitive so .CUBE/.Lut also work):
-      1. <plates>/<shot_code>.<ext>        - the normal case
+      0. <plates>/<shot>_<element>/*.<ext> - the current layout, BG element
+                                             first (see _element_dirs)
+      1. <plates>/<shot_code>.<ext>        - the older normal case
       2. exactly one *.<ext> in plates/    - covers plates carrying a take or
                                              vendor suffix, where the LUT is
                                              named after that plate rather
@@ -593,6 +731,15 @@ def resolve_lut_path(data):
         return None
 
     shot = data.get("shot_code", "")
+
+    # 0. The current delivery layout: inside the plate element's own folder,
+    #    BG first. Checked before the loose files below, which are the older
+    #    convention.
+    for element_dir in _element_dirs(plates_dir, shot):
+        found = _first_with_extension(element_dir, LUT_EXTENSIONS)
+        if found:
+            print("[qt_bake_oiio] LUT: applying per-element %s" % found)
+            return found
 
     # 1. Exact <shot_code><ext>, honouring extension priority.
     for ext in LUT_EXTENSIONS:
@@ -651,6 +798,15 @@ def find_shot_cdl(plates_dir, shot_code):
     if not plates_dir or not os.path.isdir(plates_dir):
         return None
 
+    # 0. Current layout: in the plate element's own folder, BG element first.
+    #    Usually a .ccc, which the caller must run through cdl_as_cc() before
+    #    handing to OCIO.
+    for element_dir in _element_dirs(plates_dir, shot_code):
+        found = _first_with_extension(element_dir, CDL_EXTENSIONS)
+        if found:
+            print("[qt_bake_oiio] CDL: found per-element %s" % found)
+            return found
+
     pattern = re.compile(
         r"^%s_(?P<layer>[^_]+)_v(?P<version>\d+)\.cc$" % re.escape(shot_code)
     )
@@ -676,12 +832,17 @@ def find_shot_cdl(plates_dir, shot_code):
             )
         return os.path.join(plates_dir, chosen_fname)
 
-    # Legacy fallback: bare {shot_code}.cc
+    # Legacy fallback: bare {shot_code}.cc, then anything loose in plates/
+    # carrying a CDL extension (older shots keep a .cdl named after the
+    # element there, e.g. 301_001_0050_bg01.cdl).
     legacy = os.path.join(plates_dir, "%s.cc" % shot_code)
     if os.path.exists(legacy):
         return legacy
 
-    return None
+    loose = _first_with_extension(plates_dir, CDL_EXTENSIONS)
+    if loose:
+        print("[qt_bake_oiio] CDL: found loose in plates/ %s" % loose)
+    return loose
 
 
 def is_shot_context(data):
@@ -1458,6 +1619,16 @@ def bake_sequence(data, output_paths):
 
     with tempfile.TemporaryDirectory(prefix="qt_bake_") as tmpdir:
         print("[qt_bake_oiio] Working in temp dir: %s" % tmpdir)
+
+        # A .ccc or .cdl has to become a bare .cc before OCIO will load it
+        # (see cdl_as_cc). Done here, inside the temp dir, so the extracted
+        # file goes away with the bake and nothing is written beside the
+        # plates. A failure to convert degrades to ungraded rather than
+        # killing the QT.
+        if cdl_path:
+            cdl_path = cdl_as_cc(cdl_path, tmpdir)
+            if not cdl_path:
+                print("[qt_bake_oiio] CDL: conversion failed — baking UNGRADED")
 
         # ── 1. Bake each frame ────────────────────────────────────────────────
         baked_frames = []

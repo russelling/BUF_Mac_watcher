@@ -229,19 +229,6 @@ MASK_RATIO = 2.39
 MASK_OPACITY = 0.5
 
 # ---------------------------------------------------------------------------
-# Anamorphic blow-up
-# ---------------------------------------------------------------------------
-#
-# Anamorphic shots are scaled up by this factor about the centre before being
-# placed in the delivery frame, so the QT shows the extraction rather than the
-# full captured width. Applied ONLY when a de-squeeze happened (PAR != 1.0 on
-# the first EXR) - see the call to framing_plan() in bake_sequence().
-#
-# 1.22 puts 211px off each side of a 1920-wide frame. What it does to the top
-# and bottom depends on the source aspect - see framing_plan().
-ANAMORPHIC_BLOWUP = 1.22
-
-# ---------------------------------------------------------------------------
 # Slate title + thumbnails + bottom strip
 # ---------------------------------------------------------------------------
 
@@ -490,110 +477,7 @@ def read_resolution(exr_path):
     return (None, None)
 
 
-def delivery_source_crop(src_w, src_h, out_w, out_h, blowup=1.0):
-    """
-    Which region of the (post-de-squeeze) source survives into the delivery
-    frame, as (x, y, w, h) in source pixels. None when nothing is cropped away.
-
-    THIS IS THE SINGLE SOURCE OF TRUTH shared by the movie and the slate
-    thumbnails. The movie gets to the same place by resize-then-cut, the
-    thumbnails by cut-then-resize; if each worked the framing out for itself
-    they would drift the first time one of them changed.
-
-    Returns None whenever blowup is 1.0, which is what keeps every
-    non-anamorphic thumbnail command byte-for-byte what it was before.
-    """
-    if not src_w or not src_h:
-        return None
-    if not blowup or abs(float(blowup) - 1.0) <= 1e-6:
-        return None
-
-    blowup = float(blowup)
-    scaled_w = out_w * blowup
-    scaled_h = src_h * (scaled_w / float(src_w))
-
-    # Fraction of each axis that lands inside the frame.
-    fw = min(1.0, out_w / scaled_w)
-    fh = min(1.0, out_h / scaled_h)
-
-    cw = max(1, int(round(src_w * fw)))
-    ch = max(1, int(round(src_h * fh)))
-    if cw >= src_w and ch >= src_h:
-        return None
-    return ((src_w - cw) // 2, (src_h - ch) // 2, cw, ch)
-
-
-def _crop_args(crop_to):
-    """oiiotool args for a source-space crop, or [] for None."""
-    if not crop_to:
-        return []
-    x, y, w, h = crop_to
-    return ["--cut", "%dx%d+%d+%d" % (w, h, x, y)]
-
-
-def _framing_plan_blowup(src_w, src_h, out_w, out_h, blowup):
-    """
-    Framing for an anamorphic shot: scale up by `blowup` about the centre,
-    then take the delivery frame out of the middle.
-
-    The house rule for every other shot is "fill the width, never crop the
-    sides" - losing the edges of a scope frame would hide the boom and the rig,
-    which is exactly what review is looking for. An anamorphic blow-up is the
-    deliberate exception: the extraction IS narrower than what was captured, so
-    the sides are meant to go.
-
-    Geometry, with s = blowup:
-
-        scaled_w = out_w * s                    (wider than the frame)
-        scaled_h = src_h * scaled_w / src_w     (source aspect preserved)
-        x        = (scaled_w - out_w) / 2       (cropped off EACH side)
-
-    Whether the top and bottom are also cropped depends on the source aspect,
-    and this is worth internalising before looking at a result:
-
-        scaled_h > out_h  <=>  src aspect < out_w * s / out_h  =  2.17:1 at s=1.22
-
-    So a 2.39 scope source (wider than 2.17) loses ONLY its sides and keeps
-    letterbox bars, just thinner ones: 138px becomes 49px. A source narrower
-    than 2.17 - an open-gate 1.895 plate, say - also loses 78px top and bottom
-    and its bars disappear entirely. Both are correct; they just look
-    different, and the description returned here says which happened.
-    """
-    scaled_w = int(round(out_w * blowup))
-    scaled_h = int(round(src_h * (float(scaled_w) / float(src_w))))
-    x = (scaled_w - out_w) // 2
-
-    args = ["--croptofull",
-            "--resize:filter=lanczos3", "%dx%d" % (scaled_w, scaled_h)]
-
-    if scaled_h >= out_h:
-        # Blown up past the frame in both directions: keep the middle.
-        y = (scaled_h - out_h) // 2
-        args += ["--cut", "%dx%d+%d+%d" % (out_w, out_h, x, y)]
-        note = ("%dx%d -> %dx%d, %.2fx anamorphic blow-up, centre crop %dpx "
-                "off each side and %dpx off top and bottom"
-                % (src_w, src_h, out_w, out_h, blowup, x, y))
-    else:
-        # Still wider than the frame after the blow-up: crop the sides, then
-        # letterbox what is left. --cut resets the origin and the display
-        # window to the cut size, so the letterbox steps below are byte for
-        # byte the same as the non-blow-up path.
-        args += ["--cut", "%dx%d+%d+0" % (out_w, scaled_h, x)]
-        y = (out_h - scaled_h) // 2
-        args += [
-            "--origin", "+0+%d" % y,
-            "--fullsize", "%dx%d+0+0" % (out_w, out_h),
-            "--croptofull",
-        ]
-        note = ("%dx%d -> %dx%d, %.2fx anamorphic blow-up, centre crop %dpx "
-                "off each side, letterboxed with %dpx bars top and bottom"
-                % (src_w, src_h, out_w, out_h, blowup, x, y))
-
-    return args, note
-
-
-def framing_plan(src_w, src_h, out_w=DELIVERY_WIDTH, out_h=DELIVERY_HEIGHT,
-                 blowup=1.0):
+def framing_plan(src_w, src_h, out_w=DELIVERY_WIDTH, out_h=DELIVERY_HEIGHT):
     """
     oiiotool args that make the image FILL THE FRAME HORIZONTALLY, centred.
 
@@ -630,12 +514,6 @@ def framing_plan(src_w, src_h, out_w=DELIVERY_WIDTH, out_h=DELIVERY_HEIGHT,
             "source size unknown — fitting inside %dx%d (may pillarbox)"
             % (out_w, out_h),
         )
-
-    # Anamorphic blow-up takes its own code path, deliberately, so that every
-    # NON-anamorphic bake still produces byte-for-byte the same oiiotool args
-    # it produced before this was added. Nothing below this line moved.
-    if blowup and abs(float(blowup) - 1.0) > 1e-6:
-        return _framing_plan_blowup(src_w, src_h, out_w, out_h, float(blowup))
 
     scaled_h = int(round(src_h * (float(out_w) / float(src_w))))
     args = ["--croptofull",
@@ -1217,8 +1095,7 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, frame_args=None):
 
 
 def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
-                    apply_log_convert=True, apply_cdl=True, apply_lut_stage=True,
-                    crop_to=None):
+                    apply_log_convert=True, apply_cdl=True, apply_lut_stage=True):
     """
     Same color stages as bake_frame (ACEScg -> LogC4 -> CDL -> LUT ->
     Rec.709), but for a small slate collage print rather than a delivery
@@ -1243,7 +1120,6 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
         if desqueeze_to is not None:
             dw, dh = desqueeze_to
             cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
-        cmd += _crop_args(crop_to)
         cmd += [
             "--resize:filter=lanczos3", "%dx%d" % (w, h),
             "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png,
@@ -1272,10 +1148,6 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
 
-    # Same crop the delivery frame gets, so the slate shows the coverage the
-    # movie actually has. No-op unless there is a blow-up.
-    cmd += _crop_args(crop_to)
-
     cmd += [
         "--resize:filter=lanczos3", "%dx%d" % (w, h),
         "--clamp:min=0:max=1", "--ch", "R,G,B", "-d", "uint8", "-o", dst_png,
@@ -1284,13 +1156,12 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
     run(cmd, label="Thumbnail bake: %s" % os.path.basename(src_exr))
 
 
-def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size, crop_to=None):
+def passthrough_thumbnail(src_path, dst_png, desqueeze_to, size):
     """Resize a display-referred still for the slate collage (no color pipe)."""
     cmd = [OIIOTOOL, src_path, "--croptofull"]
     if desqueeze_to is not None:
         dw, dh = desqueeze_to
         cmd += ["--resize:filter=lanczos3", "%dx%d" % (dw, dh)]
-    cmd += _crop_args(crop_to)
     w, h = size
     cmd += ["--resize:filter=lanczos3", "%dx%d" % (w, h)]
     cmd += ["--ch", "R,G,B", "-d", "uint8", "-o", dst_png]
@@ -1480,7 +1351,7 @@ def _esc_drawtext(s):
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                      tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to,
                      skip_color=False, apply_log_convert=True, apply_cdl=True,
-                     apply_lut_stage=True, thumb_crop=None):
+                     apply_lut_stage=True):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
     background, a row of three equal-size frame thumbnails (first/mid/last)
@@ -1576,35 +1447,32 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
         if skip_color:
             passthrough_thumbnail(
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
-                desqueeze_to, SBS_SIZE, crop_to=thumb_crop,
+                desqueeze_to, SBS_SIZE,
             )
             passthrough_thumbnail(
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
-                desqueeze_to, SBS_SIZE, crop_to=thumb_crop,
+                desqueeze_to, SBS_SIZE,
             )
             passthrough_thumbnail(
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
-                desqueeze_to, SBS_SIZE, crop_to=thumb_crop,
+                desqueeze_to, SBS_SIZE,
             )
         else:
             bake_thumbnail(
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
-                crop_to=thumb_crop,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
-                crop_to=thumb_crop,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
-                crop_to=thumb_crop,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
@@ -1817,18 +1685,8 @@ def bake_sequence(data, output_paths):
     # sequence is framed identically.
     out_w, out_h = DELIVERY_WIDTH, DELIVERY_HEIGHT
     frame_src_w, frame_src_h = desqueeze_to if desqueeze_to else (src_w, src_h)
-    # Anamorphic shots only: the de-squeeze already told us PAR != 1.0, which
-    # is the same signal. A shot delivered with square pixels gets no blow-up
-    # even if it was shot anamorphic - if that ever happens, the flag needs to
-    # carry the fact explicitly rather than it being inferred here.
-    blowup = ANAMORPHIC_BLOWUP if desqueeze_to is not None else 1.0
     frame_args, framing_note = framing_plan(
-        frame_src_w, frame_src_h, out_w, out_h, blowup=blowup
-    )
-    # The same region, in source pixels, for the slate thumbnails. None when
-    # there is no blow-up, which leaves those commands exactly as they were.
-    thumb_crop = delivery_source_crop(
-        frame_src_w, frame_src_h, out_w, out_h, blowup
+        frame_src_w, frame_src_h, out_w, out_h
     )
     print("[qt_bake_oiio] Delivery: %s" % framing_note)
 
@@ -1877,7 +1735,6 @@ def bake_sequence(data, output_paths):
                 data, slate_path, first, last, start_tc, out_w, out_h,
                 tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
                 lut_path=lut_path, desqueeze_to=desqueeze_to,
-                thumb_crop=thumb_crop,
                 skip_color=skip_color,
                 apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
                 apply_lut_stage=apply_lut_stage,

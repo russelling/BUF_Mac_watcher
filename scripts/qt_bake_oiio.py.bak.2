@@ -103,16 +103,14 @@ SHOW_LUT_DIR = (
 # not in this map logs loudly and falls back to SHOW_LUT_PATH rather than
 # silently baking the wrong look.
 #
-# The Nikon ZR records R3D with RED colour science (Nikon acquired RED in
-# 2024), so it takes the RED LUT rather than needing one of its own. It used
-# to be missing from this table entirely, which meant a ZR render fell through
-# to the ARRI default and baked the wrong look while only logging a warning.
-# shows/lucid_s3.yml maps it the same way; keep the two in step.
+# GAP: the Nikon ZR has no LUT in the package (nuke/init.py registers a film
+# back for it, so it is expected on the show). Add it here once the colourist
+# delivers one - until then a ZR render bakes through the ARRI LUT, which is
+# WRONG, and says so in the log.
 SHOW_LUTS_BY_CAMERA = {
     ("arri", "alexa", "alexa35", "alexa 35", "logc4", "arrilogc4"):
         "Buffalo_V4_LUT_20260720/ARRILogC4_SEV_S3_V4_R709.cube",
-    ("red", "log3g10", "redlog3g10",
-     "nikon", "zr", "nikonzr", "nikon zr"):
+    ("red", "log3g10", "redlog3g10"):
         "Buffalo_V4_LUT_20260720/REDLog3G10RWG_SEV_S3_V4_R709.cube",
     ("sony", "venice", "slog3", "sonyslog3"):
         "Slog3SG3CV_gm5_SEV_S3_V4_R709.cube",
@@ -146,28 +144,7 @@ OCIO_CONFIG = "ocio://studio-config-latest"
 # (LogC4 curve + ARRI Wide Gamut 4 primaries), a deliberate choice that
 # differs from the Nuke setup's curve-only "Input - ARRI - Curve - LogC4".
 # If the show .cube LUT expects curve-on-AP1, revisit this.
-# SOURCE COLOURSPACE. Read this before changing it.
-#
-# `aces_interchange` is a ROLE in ocio://studio-config-latest and resolves to
-# ACES2065-1 -- AP0 primaries. ACEScg is AP1. They share a white point, so
-# neutrals convert identically and only saturated colour moves; that is why
-# reading one as the other produced a QT that was "slightly off" against
-# dailies for a long time without anyone being able to point at it. Measured
-# in LogC4 code value: neutral 18% 0.0000, skin 0.0155, foliage 0.0249,
-# saturated red 0.0298, sky blue 0.0686.
-#
-# The producers do not all write the same space, so this is resolved per flag
-# by source_colorspace() rather than being one constant for everything:
-#   shots            -> OCIO_SOURCE_SHOT        (aces_interchange)
-#   asset turntables -> OCIO_SOURCE_TURNTABLE   (ACEScg - what ingest writes)
-#   any flag with "source_colorspace" -> that, outright
-OCIO_SOURCE_SHOT      = "aces_interchange"   # = ACES2065-1, AP0
-OCIO_SOURCE_TURNTABLE = "ACEScg"             # AP1
-
-# Kept so anything still referencing the old name keeps working. Do not use it
-# for new code - ask source_colorspace(data) instead.
 OCIO_ACESCG = "ACEScg"        # alias of "ACEScg" (no space anyway)
-
 OCIO_LOGC4  = "arri_logc4"    # alias of "ARRI LogC4"
 
 # Fallback when SHOW_LUT_PATH is missing: the Studio config expresses Rec.709
@@ -1135,24 +1112,9 @@ def color_pipe_stages(data, skip_color=False):
     )
 
 
-def source_colorspace(data):
-    """What colourspace this flag's EXRs are actually in, and why.
-
-    Returns (colorspace, reason). The reason is logged on every bake, so the
-    assumption is visible in the log rather than buried in a constant - which
-    is how reading AP0 data as AP1 went unnoticed.
-    """
-    explicit = data.get("source_colorspace")
-    if explicit:
-        return str(explicit), "from the flag"
-    if not is_shot_context(data):
-        return OCIO_SOURCE_TURNTABLE, "asset turntable default"
-    return OCIO_SOURCE_SHOT, "shot default"
-
-
 def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
                desqueeze_to=None, frame_args=None, apply_log_convert=True,
-               apply_cdl=True, apply_lut_stage=True, source_space=None):
+               apply_cdl=True, apply_lut_stage=True):
     """
     Apply the show color pipeline to a single EXR frame using oiiotool:
         ACEScg -> LogC4 -> CDL (optional) -> LUT -> Rec.709
@@ -1202,8 +1164,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
 
     # Step 1: ACEScg -> LogC4 via OCIO
     if apply_log_convert:
-        cmd += ["--colorconvert", source_space or OCIO_SOURCE_SHOT,
-                OCIO_LOGC4]
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
 
     # Step 2: CDL if present (caller has already decided and logged).
     if want_cdl:
@@ -1257,7 +1218,7 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, frame_args=None):
 
 def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
                     apply_log_convert=True, apply_cdl=True, apply_lut_stage=True,
-                    crop_to=None, source_space=None):
+                    crop_to=None):
     """
     Same color stages as bake_frame (ACEScg -> LogC4 -> CDL -> LUT ->
     Rec.709), but for a small slate collage print rather than a delivery
@@ -1293,8 +1254,7 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
     cmd = [OIIOTOOL, "--colorconfig", OCIO_CONFIG, src_exr, "--croptofull"]
 
     if apply_log_convert:
-        cmd += ["--colorconvert", source_space or OCIO_SOURCE_SHOT,
-                OCIO_LOGC4]
+        cmd += ["--colorconvert", OCIO_ACESCG, OCIO_LOGC4]
 
     if want_cdl:
         cmd += ["--ociofiletransform", cdl_path]
@@ -1520,7 +1480,7 @@ def _esc_drawtext(s):
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                      tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to,
                      skip_color=False, apply_log_convert=True, apply_cdl=True,
-                     apply_lut_stage=True, thumb_crop=None, source_space=None):
+                     apply_lut_stage=True, thumb_crop=None):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
     background, a row of three equal-size frame thumbnails (first/mid/last)
@@ -1630,21 +1590,21 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
             bake_thumbnail(
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
-                crop_to=thumb_crop, source_space=source_space,
+                crop_to=thumb_crop,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
-                crop_to=thumb_crop, source_space=source_space,
+                crop_to=thumb_crop,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
             bake_thumbnail(
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
-                crop_to=thumb_crop, source_space=source_space,
+                crop_to=thumb_crop,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
@@ -1774,13 +1734,6 @@ def bake_sequence(data, output_paths):
         % (include_slate, skip_color, apply_log, apply_cdl_stage, apply_lut_stage)
     )
 
-    # Source colourspace, resolved per flag and LOGGED. Getting this wrong is
-    # invisible on neutrals and wrong on everything saturated, so it does not
-    # get to be a silent constant. See source_colorspace().
-    src_space, src_why = source_colorspace(data)
-    print("[qt_bake_oiio] Source colourspace: %s (%s) -> %s"
-          % (src_space, src_why, OCIO_LOGC4))
-
     # CDL path (shots only — assets skip CDL). CDL is an optional creative
     # grade: if absent, skip it but log so it's visible that the QT is
     # ungraded. color_pipe.cdl=False forces skip even when a .cc exists.
@@ -1909,7 +1862,7 @@ def bake_sequence(data, output_paths):
                     src, dst, cdl_path=cdl_path, lut_path=lut_path,
                     desqueeze_to=desqueeze_to, frame_args=frame_args,
                     apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
-                    apply_lut_stage=apply_lut_stage, source_space=src_space,
+                    apply_lut_stage=apply_lut_stage,
                 )
             baked_frames.append(dst)
 
@@ -1924,7 +1877,7 @@ def bake_sequence(data, output_paths):
                 data, slate_path, first, last, start_tc, out_w, out_h,
                 tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
                 lut_path=lut_path, desqueeze_to=desqueeze_to,
-                thumb_crop=thumb_crop, source_space=src_space,
+                thumb_crop=thumb_crop,
                 skip_color=skip_color,
                 apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
                 apply_lut_stage=apply_lut_stage,

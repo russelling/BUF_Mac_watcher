@@ -4,3 +4,12 @@ scripts/logs/
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Patch-script leftovers. Project rule 12 ships every change to a live file
+# as a numbered .bak, and `*.bak` alone does NOT match `foo.sh.bak.1`.
+*.bak
+*.bak.[0-9]*
+*.tmp
+
+# Tombstones the SMB mount leaves when a delete of an open file is attempted.
+.smbdelete*

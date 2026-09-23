@@ -35,6 +35,28 @@ import time
 
 import sgtk
 
+# ---------------------------------------------------------------------------
+# buf package -- submission-package delivery (added 2026-09-22)
+# ---------------------------------------------------------------------------
+# A baked QT lands in a dated, numbered submission package under
+# io/vendors/inh/_staging, with a CSV manifest, instead of the shot review
+# folder + dated editorial drop. Nothing here talks to ShotGrid: submission
+# happens after the package is moved out of _staging.
+# See claude/qt-watcher-buf-cutover-2026-09-22.md.
+#
+# sys.path and BUF_SHOW are set here rather than in the LaunchAgent plist
+# deliberately: one file to patch, one file to revert, no launchd reload risk.
+# An externally-set BUF_SHOW still wins.
+BUF_PACKAGE_ROOT = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/buffalo-pipeline"
+if BUF_PACKAGE_ROOT not in sys.path:
+    sys.path.insert(0, BUF_PACKAGE_ROOT)
+os.environ.setdefault("BUF_SHOW", "lucid_s3")
+
+from buf import flags as buf_flags        # noqa: E402
+from buf import sg as buf_sg              # noqa: E402
+from buf import manifest as buf_manifest  # noqa: E402
+from buf import deliver as buf_deliver    # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -80,25 +102,80 @@ REVIEW_PROXY_EXT = ".mp4"
 # "delete" or "rename" — what to do with flag files after processing
 PROCESSED_ACTION = "rename"
 
-LOG_FILE = os.path.join(SCRIPTS_DIR, "logs", "qt_watcher.log")
+# Local and per-user, NOT on the share.
+#
+# This used to be os.path.join(SCRIPTS_DIR, "logs", "qt_watcher.log") -- i.e.
+# inside the checkout on the SMB share -- which meant every machine that ever
+# ran the watcher appended to the same file, and that nothing ever appeared
+# in the path the installer, WATCHER_PREREQUISITES.md and the monitor panel
+# all point at. On M4MM02 (2026-09-22) that local file sat at 0 bytes while
+# the watcher was baking QTs normally, so a healthy watcher looked dead.
+#
+# This is also launchd's StandardOutPath, deliberately: one file, written by
+# one process, that survives the share going away. See _stdout_is_log_file()
+# for why that does not double every line.
+LOG_FILE = os.environ.get("BUF_WATCHER_LOG") or os.path.expanduser(
+    os.path.join("~", "Library", "Logs", "buffalovfx", "qt_watcher.log"))
 
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
+# Resolved once, lazily: None until a definite answer is available, so a
+# transient stat failure cannot latch the wrong value for the process's life.
+_stdout_is_log = None
+
+# One complaint about an unwritable log, not one per line.
+_log_write_failed = False
+
+
+def _stdout_is_log_file():
+    """True when stdout already lands in LOG_FILE.
+
+    Under launchd it does -- LOG_FILE is the plist's StandardOutPath -- so
+    writing the line again would double every entry in the file. Compared by
+    (device, inode) rather than by path, because the answer is about which
+    file the fd points at, not what it is called.
+    """
+    global _stdout_is_log
+    if _stdout_is_log is None:
+        try:
+            a = os.fstat(sys.stdout.fileno())
+            b = os.stat(LOG_FILE)
+            _stdout_is_log = (a.st_dev, a.st_ino) == (b.st_dev, b.st_ino)
+        except Exception:
+            # No answer yet (no log file, or stdout is a pipe). Write our own
+            # copy this time and ask again next time.
+            return False
+    return _stdout_is_log
+
+
 def log(msg):
+    global _log_write_failed
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = "[%s] %s" % (timestamp, msg)
-    print(line)
+
+    # flush: under launchd stdout is a file, so it is block-buffered. Without
+    # this the log appears in 8KB bursts, long after the thing it describes.
+    print(line, flush=True)
+
+    if _stdout_is_log_file():
+        return
+
     try:
         log_dir = os.path.dirname(LOG_FILE)
-        if not os.path.exists(log_dir):
+        if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir)
         with open(LOG_FILE, "a") as f:
             f.write(line + "\n")
-    except Exception:
-        pass
+    except Exception as exc:
+        # Said once, on stdout, rather than swallowed forever: a log that
+        # cannot be written is worth knowing about exactly when it happens.
+        if not _log_write_failed:
+            _log_write_failed = True
+            print("[%s] WARNING: cannot write %s (%s) -- logging to stdout "
+                  "only from here." % (timestamp, LOG_FILE, exc), flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -529,16 +606,23 @@ def process_flag(tk, sg, flag_path):
     is_asset  = flag_type == "asset_turntable"
 
     # ── Resolve output paths ─────────────────────────────────────────────────
+    # buf.sg.resolve_output_paths puts the bake inside today's submission
+    # package; buf.submission owns the numbering and scans from_inh/_staging
+    # to continue the day's sequence.
+    #
+    # Parsed WITHOUT validation on purpose: buf.flags.validate() is stricter
+    # than this watcher has ever been (it requires entity_type, which the old
+    # upload path defaulted to "Shot"), and a cutover is the wrong moment to
+    # start rejecting flags that used to work.
     try:
-        if is_asset:
-            primary_path, editorial_path = resolve_asset_output_paths(tk, data)
-        else:
-            primary_path, editorial_path = resolve_shot_output_paths(tk, data)
+        payload = buf_flags.parse(data, validate_now=False)
+        primary_path = buf_sg.resolve_output_paths(payload)[0]
     except Exception as exc:
         log("ERROR resolving output paths: %s" % exc)
         return False
 
-    output_paths = [primary_path, editorial_path]
+    log("Delivering to submission package: %s" % os.path.dirname(primary_path))
+    output_paths = [primary_path]
 
     # ── Run bake ─────────────────────────────────────────────────────────────
     # NOTE: both shots and asset turntables route through the license-free
@@ -561,22 +645,41 @@ def process_flag(tk, sg, flag_path):
             "%s — flag left in place for retry" % primary_path)
         return False
 
-    # Upload the small h264 proxy the bake wrote beside the ProRes - that is
-    # what the ShotGrid web player can actually stream. sg_path_to_movie still
-    # records the ProRes. If the proxy is missing (older bake, or the proxy
-    # encode failed) fall back to the ProRes rather than skipping the upload.
-    proxy_path = review_proxy_path(primary_path)
-    if os.path.exists(proxy_path):
-        upload_path = proxy_path
-    else:
-        upload_path = primary_path
-        log("WARNING: no review proxy at %s — uploading the ProRes instead. "
-            "It is large and ShotGrid may fail to transcode it." % proxy_path)
+    # NO ShotGrid submission here. The package is delivered to _staging and
+    # registered in its CSV manifest; creating Versions and uploading media
+    # happens afterwards, once the package is moved out of _staging.
+    #
+    # Companions: buf.deliver files the h264 proxy the bake just wrote into
+    # h264/, and for SHOTS builds the DNxHR SQ editorial MXF in dnx/ from the
+    # finished ProRes -- so the DNx matches the master's colour and burn-ins
+    # by construction rather than by review. Asset turntables get no DNx.
+    #
+    # It never raises and it cannot fail the flag: the ProRes is already
+    # delivered by this point. Every problem it reports is logged.
+    #
+    # Runs BEFORE the manifest, because the manifest reads the delivered
+    # master off disk for its Resolution column -- recording first would
+    # describe a package that is not finished being assembled.
+    try:
+        delivery = buf_deliver.companions(payload, primary_path)
+        log("Delivery: %s" % delivery.summary())
+    except Exception as exc:
+        log("WARNING: companion delivery failed for %s: %s"
+            % (primary_path, exc))
 
-    if upload_version(sg, data, primary_path, upload_path=upload_path) is None:
-        log("ERROR: ShotGrid upload failed for %s — flag left in place for retry"
-            % flag_path)
-        return False
+    # Record the delivery in this package's CSV manifest. A manifest failure
+    # must NOT fail the flag: by this point the QT is baked, which is minutes
+    # of work, and losing that to a CSV error would be the wrong trade.
+    #
+    # The CSV mirrors the client's own manifest layout (2026-09-22), which
+    # has no column for a ShotGrid URL. Whatever submits the package records
+    # that on the Version itself, or in a side file that does not travel with
+    # the delivery.
+    try:
+        csv_path = buf_manifest.record(payload, primary_path)
+        log("Manifest updated: %s" % csv_path)
+    except Exception as exc:
+        log("WARNING: manifest NOT updated for %s: %s" % (primary_path, exc))
 
     # ── Mark processed ───────────────────────────────────────────────────────
     mark_processed(flag_path)

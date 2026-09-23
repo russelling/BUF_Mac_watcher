@@ -180,7 +180,26 @@ OCIO_LOGC4  = "arri_logc4"    # alias of "ARRI LogC4"
 OCIO_REC709_DISPLAY = "Gamma 2.2 Rec.709 - Display"
 OCIO_REC709_VIEW    = "ACES 2.0 - SDR 100 nits (Rec.709)"
 
+# ---------------------------------------------------------------------------
+# Frame rate: TIMECODE rate and PLAYBACK rate are different numbers
+# ---------------------------------------------------------------------------
+#
+# The show delivers at 23.976. Its timecode is NON-DROP-FRAME counted at 24
+# frames per timecode-second -- frames run 00..23 and the clock drifts against
+# wall time. That is the standard for 23.976, not a rounding error.
+#
+# So FPS stays 24. It is the TIMECODE rate, and three functions below
+# (timecode_from_frame, tc_to_frames, frames_to_tc) do integer // and % with
+# it; a fractional value there returns fractional frame counts. ffmpeg's
+# drawtext `timecode_rate` also takes it, formatted with %d -- 23.976 would
+# silently become 23 and the burn-in clock would run wrong.
 FPS = 24
+
+# The PLAYBACK rate, used only for encoding. Passed to ffmpeg as an exact
+# rational: "-r 24000/1001" writes 23.976023976..., while "-r 23.976" writes
+# 23976/1000, a subtly different rate some tools flag as a mismatch.
+PLAYBACK_FPS = "24000/1001"
+PLAYBACK_FRAME_DURATION = 1001.0 / 24000     # 0.0417083... seconds
 
 # Fixed final delivery size for ALL QTs. Every output is exactly this size
 # regardless of source resolution or squeeze: the image is scaled to fill the
@@ -690,14 +709,27 @@ def framing_plan(src_w, src_h, out_w=DELIVERY_WIDTH, out_h=DELIVERY_HEIGHT,
 
 def resolve_start_timecode(data, exr_pattern, first):
     """
-    Determine the source start timecode, in priority order:
+    Determine the delivered start timecode, in priority order:
 
-      1. start_timecode from the flag (authoritative - captured at submission
-         from the EXR's embedded TC, which is what the artist saw).
-      2. Read it directly from the first EXR's metadata (fallback if the flag
-         didn't carry one).
-      3. Derive from the frame number (last resort - keeps the burn-in
-         populated even when no real TC exists anywhere).
+      1. start_timecode from the flag - an explicit value from a producer
+         still wins, so a one-off delivery can pin a specific TC.
+      2. Derived from the frame number: the timecode counts the frames
+         themselves, so frame 1001 is 00:00:41:17 (41 * 24 + 17 = 1001).
+
+    CHANGED 2026-09-22 (Mark): frame-derived is the RULE, not the last
+    resort, and the source EXR's embedded camera timecode no longer decides
+    what is delivered. Editorial wants the QT's timecode to match the frame
+    count. This applies to every bake - shots, turntables, review drops -
+    so there is one rule here rather than one per producer.
+
+    The EXR's own timecode is still read, FOR THE LOG ONLY, and a divergence
+    is printed. Overriding real camera timecode without saying so would be
+    exactly the kind of unreported substitution this pipeline has been bitten
+    by before. The read can never fail a bake.
+
+    23.976 vs 24 is not a contradiction: the encode runs at PLAYBACK_FPS
+    (24000/1001) while timecode is counted non-drop at FPS (24 labelled
+    frames per labelled second), which is what makes 1001 -> 00:00:41:17.
 
     Returns (tc_string, source_label) for logging/slate clarity.
     """
@@ -705,13 +737,22 @@ def resolve_start_timecode(data, exr_pattern, first):
     if flag_tc:
         return str(flag_tc), "flag"
 
-    first_exr = frame_path(exr_pattern, first)
-    if os.path.exists(first_exr):
-        exr_tc = extract_exr_timecode(first_exr)
-        if exr_tc:
-            return exr_tc, "exr"
+    derived = timecode_from_frame(first)
 
-    return timecode_from_frame(first), "frame-derived"
+    # Diagnostic only - never changes what is delivered, never raises.
+    try:
+        first_exr = frame_path(exr_pattern, first)
+        if first_exr and os.path.exists(first_exr):
+            exr_tc = extract_exr_timecode(first_exr)
+            if exr_tc and exr_tc != derived:
+                print("[qt_bake_oiio] Timecode: delivering %s (from frame "
+                      "%s); the source EXR carries %s, which is NOT used."
+                      % (derived, first, exr_tc))
+    except Exception as exc:                       # noqa: BLE001
+        print("[qt_bake_oiio] Timecode: could not read the source EXR's "
+              "timecode for comparison (%s). Delivering %s." % (exc, derived))
+
+    return derived, "frame-derived"
 
 
 SHOTS_ROOT = "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/shots"
@@ -1431,10 +1472,12 @@ def build_drawtext_filters(data, frame_offset, start_tc,
         % (esc(upper_left), margin, margin, font_size)
     )
 
-    # Upper CENTRE: date (moved from upper right, which the timecode now owns)
+    # Lower RIGHT: date. Right- and bottom-anchored using the same margin and
+    # the same x=w-N-tw / y=h-N-th forms as the timecode and the lower left,
+    # so all four corners sit on one grid.
     filters.append(
-        "drawtext=text='%s':x=(w-tw)/2:y=%d:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (esc(upper_centre), margin, font_size)
+        "drawtext=text='%s':x=w-%d-tw:y=h-%d-th:fontsize=%d:fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (esc(upper_centre), margin, margin, font_size)
     )
 
     # Upper RIGHT: SOURCE timecode, anchored to start_tc and auto-incremented
@@ -1939,10 +1982,10 @@ def bake_sequence(data, output_paths):
         with open(concat_list, "w") as f:
             if slate_path:
                 f.write("file '%s'\n" % slate_path)
-                f.write("duration %f\n" % (1.0 / FPS))
+                f.write("duration %f\n" % PLAYBACK_FRAME_DURATION)
             for baked in baked_frames:
                 f.write("file '%s'\n" % baked)
-                f.write("duration %f\n" % (1.0 / FPS))
+                f.write("duration %f\n" % PLAYBACK_FRAME_DURATION)
             if baked_frames:
                 f.write("file '%s'\n" % baked_frames[-1])
 
@@ -1989,7 +2032,7 @@ def bake_sequence(data, output_paths):
                 "-profile:v", "3",        # ProRes 422 HQ
                 "-vendor", "apl0",
                 "-pix_fmt", "yuv422p10le",
-                "-r", str(FPS),
+                "-r", PLAYBACK_FPS,
             ]
 
             if embed_tc:
@@ -2047,7 +2090,7 @@ def write_review_proxy(data, src_movie, embed_tc=None):
         # h264 requires even dimensions; harmless when they already are.
         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-movflags", "+faststart",
-        "-r", str(FPS),
+        "-r", PLAYBACK_FPS,
     ]
     if embed_tc:
         cmd += ["-timecode", embed_tc]
@@ -2118,7 +2161,7 @@ def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
                 # slate (1 frame) + movie
                 cmd = [
                     FFMPEG, "-y",
-                    "-loop", "1", "-t", str(1.0 / FPS), "-i", slate_path,
+                    "-loop", "1", "-t", str(PLAYBACK_FRAME_DURATION), "-i", slate_path,
                     "-i", movie_path,
                     "-filter_complex",
                     "[0:v]%s[slate];[1:v]%s[mov];[slate][mov]concat=n=2:v=1:a=0[out]"
@@ -2128,7 +2171,7 @@ def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
                     "-profile:v", "3",
                     "-vendor", "apl0",
                     "-pix_fmt", "yuv422p10le",
-                    "-r", str(FPS),
+                    "-r", PLAYBACK_FPS,
                     "-timecode", burnin_start_tc,
                     out_path,
                 ]
@@ -2141,7 +2184,7 @@ def bake_movie_passthrough(data, output_paths, movie_path, include_slate):
                     "-profile:v", "3",
                     "-vendor", "apl0",
                     "-pix_fmt", "yuv422p10le",
-                    "-r", str(FPS),
+                    "-r", PLAYBACK_FPS,
                     "-timecode", burnin_start_tc,
                     out_path,
                 ]

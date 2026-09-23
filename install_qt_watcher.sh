@@ -34,6 +34,12 @@ CONFIG_ROOT="${CONFIG_ROOT:-$STORAGE_ROOT/repo/pipeline/config/flow/current}"
 # Where qt_watcher.py lives (BUF_Mac_watcher checkout). Auto-detected if unset.
 WATCHER_SCRIPT="${WATCHER_SCRIPT:-}"
 
+# This installer lives in the BUF_Mac_watcher checkout, so scripts/ is its
+# sibling. Resolved once here because two steps need it: step 4 reads the
+# pinned ffmpeg path out of scripts/qt_bake_oiio.py, and step 7 locates
+# scripts/qt_watcher.py.
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+
 # Flow Production Tracking Desktop bundled interpreter.
 FLOW_PYTHON="${FLOW_PYTHON:-/Applications/Shotgun.app/Contents/Resources/Python3/bin/python3}"
 
@@ -170,42 +176,89 @@ hdr "4. ffmpeg (needs drawtext/freetype)"
 # The acceptance test is drawtext support, NOT which formula is installed.
 # The core ffmpeg formula has historically lacked it; the slate and per-frame
 # burn-ins fail at runtime without it while the watcher still looks healthy.
+has_drawtext() {
+  [ -n "${1:-}" ] && [ -x "$1" ] && \
+    "$1" -hide_banner -filters 2>/dev/null | grep -q '[[:space:]]drawtext[[:space:]]'
+}
+
 find_ffmpeg_with_drawtext() {
   local c
-  for c in /opt/homebrew/opt/ffmpeg-full/bin/ffmpeg \
+  for c in "${FFMPEG_PINNED:-}" \
+           /opt/homebrew/opt/ffmpeg-full/bin/ffmpeg \
            /opt/homebrew/bin/ffmpeg \
            /usr/local/bin/ffmpeg \
            "$(command -v ffmpeg 2>/dev/null || true)"; do
-    if [ -z "$c" ] || [ ! -x "$c" ]; then continue; fi
-    if "$c" -hide_banner -filters 2>/dev/null | grep -q '[[:space:]]drawtext[[:space:]]'; then
-      printf '%s' "$c"; return 0
-    fi
+    if has_drawtext "$c"; then printf '%s' "$c"; return 0; fi
   done
   return 1
 }
 
-FFMPEG="$(find_ffmpeg_with_drawtext || true)"
+# The bake does NOT use whatever ffmpeg is on PATH: qt_bake_oiio.py hard-codes
+# an absolute path in its FFMPEG constant. Read that constant from the sibling
+# script so this check can never drift from the binary the bake actually runs.
+# (watcher_launch.txt reads it the same way, for the same reason.)
+FFMPEG_PINNED=""
+if [ -n "${SELF_DIR:-}" ] && [ -f "$SELF_DIR/scripts/qt_bake_oiio.py" ]; then
+  FFMPEG_PINNED="$(sed -n 's/^FFMPEG = "\(.*\)"/\1/p' \
+    "$SELF_DIR/scripts/qt_bake_oiio.py" | head -1)"
+fi
 
-if [ -n "$FFMPEG" ]; then
-  ok "ffmpeg with drawtext: $FFMPEG"
+# The requirement is the pinned path, not "some ffmpeg with drawtext".
+if [ -n "$FFMPEG_PINNED" ] && has_drawtext "$FFMPEG_PINNED"; then
+  FFMPEG="$FFMPEG_PINNED"
+  ok "ffmpeg with drawtext: $FFMPEG (pinned in qt_bake_oiio.py)"
 else
-  ANY_FFMPEG="$(command -v ffmpeg 2>/dev/null || true)"
-  if [ -n "$ANY_FFMPEG" ]; then
-    bad "ffmpeg found ($ANY_FFMPEG) but it has NO drawtext filter"
-    info "Slate and burn-ins will fail at bake time. A 'full' build is needed."
+  FFMPEG="$(find_ffmpeg_with_drawtext || true)"
+
+  if [ -z "$FFMPEG_PINNED" ] && [ -n "$FFMPEG" ]; then
+    # qt_bake_oiio.py was not beside this installer, so the pin could not be
+    # read. Fall back to the old, weaker PATH test rather than pass silently.
+    warn "Could not read the FFMPEG pin from scripts/qt_bake_oiio.py"
+    info "Falling back to a PATH test. Confirm the bake's FFMPEG constant"
+    info "points at a drawtext-capable build before trusting this."
+    ok "ffmpeg with drawtext: $FFMPEG"
   else
-    bad "ffmpeg not found"
-  fi
-  if [ -n "$BREW" ] && ask "Try the homebrew-ffmpeg tap (full-featured build)?"; then
-    "$BREW" tap homebrew-ffmpeg/ffmpeg 2>/dev/null || true
-    "$BREW" install homebrew-ffmpeg/ffmpeg/ffmpeg || \
-      warn "Tap install failed — see watcher_launch.txt for the formula this studio uses."
-    FFMPEG="$(find_ffmpeg_with_drawtext || true)"
-    if [ -n "$FFMPEG" ]; then
-      INSTALLED+=("ffmpeg (drawtext-capable)")
-      ok "ffmpeg with drawtext: $FFMPEG"
+    if [ -n "$FFMPEG_PINNED" ]; then
+      bad "qt_bake_oiio.py pins $FFMPEG_PINNED — missing, or no drawtext"
+    elif [ -n "$(command -v ffmpeg 2>/dev/null || true)" ]; then
+      bad "ffmpeg found ($(command -v ffmpeg)) but it has NO drawtext filter"
+      info "Slate and burn-ins will fail at bake time. A 'full' build is needed."
     else
-      bad "Still no drawtext-capable ffmpeg. Consult watcher_launch.txt."
+      bad "ffmpeg not found"
+    fi
+
+    if [ -n "$FFMPEG" ] && [ "$FFMPEG" != "$FFMPEG_PINNED" ]; then
+      info "A drawtext-capable ffmpeg does exist at:"
+      info "  $FFMPEG"
+      info "but the bake hard-codes the pinned path, so it will never run it."
+    fi
+
+    info "This studio uses the 'ffmpeg-full' formula. It installs alongside"
+    info "any core ffmpeg, at /opt/homebrew/opt/ffmpeg-full/bin/ffmpeg."
+    info "The homebrew-ffmpeg tap is NOT a substitute: its formula is also"
+    info "named 'ffmpeg', so brew refuses it whenever core ffmpeg is present."
+
+    if [ -n "$BREW" ] && ask "Install ffmpeg-full with Homebrew now?"; then
+      "$BREW" install ffmpeg-full || \
+        warn "brew install ffmpeg-full failed — see watcher_launch.txt."
+      if [ -n "$FFMPEG_PINNED" ] && has_drawtext "$FFMPEG_PINNED"; then
+        FFMPEG="$FFMPEG_PINNED"
+      else
+        FFMPEG="$(find_ffmpeg_with_drawtext || true)"
+      fi
+      if [ -n "$FFMPEG" ] && { [ -z "$FFMPEG_PINNED" ] || [ "$FFMPEG" = "$FFMPEG_PINNED" ]; }; then
+        INSTALLED+=("ffmpeg-full (drawtext-capable)")
+        # The bad() above incremented FAILURES; a capable build is now in
+        # place, so retract it. Without this the run ends "1 check failed"
+        # and refuses to install the LaunchAgent, two lines after OK.
+        FAILURES=$((FAILURES > 0 ? FAILURES - 1 : 0))
+        ok "ffmpeg with drawtext: $FFMPEG"
+      else
+        bad "Still no drawtext-capable ffmpeg at the pinned path."
+        info "If ffmpeg-full landed somewhere else, point the FFMPEG constant"
+        info "in scripts/qt_bake_oiio.py at it. Installed versions:"
+        ls -1 /opt/homebrew/Cellar/ffmpeg-full/ 2>/dev/null | sed 's/^/       /'
+      fi
     fi
   fi
 fi
@@ -266,7 +319,23 @@ fi
 hdr "7. Watcher script"
 
 if [ -z "$WATCHER_SCRIPT" ]; then
-  WATCHER_SCRIPT="$(find "$STORAGE_ROOT" -maxdepth 5 -name qt_watcher.py -type f 2>/dev/null | head -1)"
+  # This installer lives in the BUF_Mac_watcher checkout, so the watcher is
+  # its sibling: <repo>/scripts/qt_watcher.py. Deriving it from here is
+  # correct by construction and survives any relocation of the repo.
+  #
+  # The previous `find "$STORAGE_ROOT" -maxdepth 5` could not reach it at all:
+  # post-relocation the script sits EIGHT levels below the storage root, so
+  # the installer reported "qt_watcher.py not found" while that very file was
+  # running in front of it (Mac-Studio, 2026-09-22). Raising the depth would
+  # also mean walking shots/ and assets/ over SMB, which is slow enough to
+  # look like a hang.
+  # SELF_DIR is resolved once at the top of this script.
+  if [ -n "$SELF_DIR" ] && [ -f "$SELF_DIR/scripts/qt_watcher.py" ]; then
+    WATCHER_SCRIPT="$SELF_DIR/scripts/qt_watcher.py"
+  else
+    # Fallback, scoped to repo/ so it cannot wander into the render trees.
+    WATCHER_SCRIPT="$(find "$STORAGE_ROOT/repo" -maxdepth 8 -name qt_watcher.py -type f 2>/dev/null | head -1)"
+  fi
 fi
 
 if [ -n "$WATCHER_SCRIPT" ] && [ -f "$WATCHER_SCRIPT" ]; then
@@ -293,7 +362,23 @@ hdr "8. Duplicate-watcher check"
 info "Only ONE host may run this watcher. Two watchers polling the same"
 info "trees race on the same .render_complete_*.json flags and produce"
 info "double-encoded QTs and duplicate Versions in Flow."
-info "If the old Mac Studio still runs it, on THAT machine run:"
+
+# Look, rather than just advise. On 2026-09-22 a nine-day-old watcher running
+# PRE-PATCH code was still polling while two more were started the same
+# afternoon; nothing surfaced that until the log was read by hand. A process
+# started before a code change is running the OLD code, whatever is on disk.
+RUNNING_WATCHERS="$(pgrep -f "qt_watcher.py" 2>/dev/null || true)"
+if [ -n "$RUNNING_WATCHERS" ]; then
+  warn "Watcher process(es) already running on THIS machine:"
+  # shellcheck disable=SC2086
+  ps -o pid,user,start,command -p $RUNNING_WATCHERS 2>/dev/null | sed 's/^/       /'
+  info "Check the START time: anything predating your last code change is"
+  info "running the old code from memory. Stop it before bootstrapping, or"
+  info "you will have two watchers on one tree."
+else
+  ok "No qt_watcher process currently running on this machine"
+fi
+info "On any OTHER host that still runs it:"
 info "  launchctl bootout gui/\$(id -u)/$LABEL"
 
 # ---------------------------------------------------------------------------
@@ -307,6 +392,58 @@ else
   mkdir -p "$LOG_DIR" "$PLIST_DIR"
   ok "Log directory (local): $LOG_DIR"
 
+  # --- Local launcher -------------------------------------------------------
+  # launchd's spawn context lacks the login session's SMB authentication, so
+  # it cannot reach the share BEFORE the job starts: a ProgramArguments path
+  # on the share fails as [Errno 2], and a WorkingDirectory on the share fails
+  # as EX_CONFIG (78). Same root cause as the stdio paths above, which is why
+  # those are local too.
+  #
+  # So launchd is pointed at a launcher on the LOCAL disk, which it can always
+  # find. The launcher waits for the share, then execs the real watcher.
+  LAUNCHER_DIR="$HOME/Library/Application Support/BuffaloVFX"
+  LAUNCHER="$LAUNCHER_DIR/run_qt_watcher.sh"
+  mkdir -p "$LAUNCHER_DIR"
+
+  cat > "$LAUNCHER" <<LAUNCHER_EOF
+#!/bin/bash
+# Generated by install_qt_watcher.sh -- do not edit here, edit the installer.
+#
+# Local on purpose: launchd can always reach this file, and it waits for the
+# share rather than dying the instant the mount is not yet visible.
+
+PY="$FLOW_PYTHON"
+SCRIPT="$WATCHER_SCRIPT"
+DIAG="$LOG_DIR/launcher.log"
+WAIT_SECONDS=600
+INTERVAL=10
+
+echo "=== \$(date) launcher starting (uid \$(id -u)) ===" >> "\$DIAG" 2>&1
+
+elapsed=0
+while [ ! -r "\$SCRIPT" ]; do
+  if [ "\$elapsed" -ge "\$WAIT_SECONDS" ]; then
+    {
+      echo "[\$(date)] share unreachable after \${WAIT_SECONDS}s: \$SCRIPT"
+      echo "  /Volumes:"
+      ls -la /Volumes/ 2>&1
+      echo "  matching mounts:"
+      /sbin/mount 2>&1 | grep -i -e lucid -e atv || echo "    (none)"
+      echo "  Exiting non-zero so launchd retries."
+    } >> "\$DIAG" 2>&1
+    exit 1
+  fi
+  sleep "\$INTERVAL"
+  elapsed=\$((elapsed + INTERVAL))
+done
+
+echo "[\$(date)] share reachable after \${elapsed}s -- starting watcher" >> "\$DIAG"
+exec "\$PY" "\$SCRIPT"
+LAUNCHER_EOF
+
+  chmod +x "$LAUNCHER"
+  ok "Local launcher: $LAUNCHER"
+
   NEW_PLIST="$(mktemp -t qtwatcher_plist)"
   # NOTE: plists do NOT expand '~' — every path here is absolute.
   cat > "$NEW_PLIST" <<PLIST
@@ -317,10 +454,12 @@ else
     <key>Label</key>
     <string>$LABEL</string>
 
+    <!-- The LOCAL launcher, never the script on the share: launchd cannot
+         resolve a share path at spawn (see the launcher generation above). -->
     <key>ProgramArguments</key>
     <array>
-        <string>$FLOW_PYTHON</string>
-        <string>$WATCHER_SCRIPT</string>
+        <string>/bin/bash</string>
+        <string>$LAUNCHER</string>
     </array>
 
     <key>RunAtLoad</key>
@@ -344,8 +483,10 @@ else
         <string>$TK_CORE_PY</string>
     </dict>
 
+    <!-- Local: a WorkingDirectory on the share is one more thing launchd
+         must reach before the job starts, and it fails as EX_CONFIG (78). -->
     <key>WorkingDirectory</key>
-    <string>$WATCHER_DIR</string>
+    <string>$HOME</string>
 </dict>
 </plist>
 PLIST
@@ -406,6 +547,48 @@ if launchctl print "$GUI_DOMAIN/$LABEL" >/dev/null 2>&1; then
   fi
 else
   warn "Service not registered in $GUI_DOMAIN"
+fi
+
+# ---------------------------------------------------------------------------
+hdr "11. Monitor app on the Desktop"
+
+# The status panel talks to launchctl in THIS user's gui/<uid> domain and tails
+# THIS user's log, so it only ever reports on the machine and account it was
+# launched from. Building it here is the one place that is guaranteed to be the
+# watcher host.
+#
+# Offered, never forced, and never fatal: the watcher does not need the panel,
+# so a failure warns instead of calling bad(). A missing Desktop icon must not
+# be the reason a LaunchAgent is refused.
+MONITOR_BUILDER="${SELF_DIR:-}/watcher_monitor/make_monitor_app.sh"
+MONITOR_APP="$HOME/Desktop/QT Watcher Monitor.app"
+
+build_monitor_app() {
+  local out
+  if out="$(bash "$MONITOR_BUILDER" 2>&1)"; then
+    return 0
+  fi
+  warn "Could not build the Desktop app. The watcher itself is unaffected."
+  printf '%s\n' "$out" | sed 's/^/        /'
+  return 1
+}
+
+if [ ! -f "$MONITOR_BUILDER" ]; then
+  warn "Monitor builder not found: $MONITOR_BUILDER"
+  info "Skipping the Desktop app. Nothing else is affected."
+elif [ -d "$MONITOR_APP" ]; then
+  ok "Monitor app already on the Desktop"
+  if ask "Rebuild it (picks up a new icon or launcher)?"; then
+    if build_monitor_app; then
+      INSTALLED+=("QT Watcher Monitor.app (rebuilt)")
+      ok "Rebuilt $MONITOR_APP"
+    fi
+  fi
+elif ask "Put a QT Watcher Monitor icon on the Desktop?"; then
+  if build_monitor_app; then
+    INSTALLED+=("QT Watcher Monitor.app")
+    ok "Built $MONITOR_APP"
+  fi
 fi
 
 hdr "Summary"

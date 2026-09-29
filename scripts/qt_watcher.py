@@ -56,6 +56,7 @@ from buf import flags as buf_flags        # noqa: E402
 from buf import sg as buf_sg              # noqa: E402
 from buf import manifest as buf_manifest  # noqa: E402
 from buf import deliver as buf_deliver    # noqa: E402
+from buf import submission as buf_submission  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -675,11 +676,43 @@ def process_flag(tk, sg, flag_path):
     # has no column for a ShotGrid URL. Whatever submits the package records
     # that on the Version itself, or in a side file that does not travel with
     # the delivery.
+    manifest_ok = False
     try:
         csv_path = buf_manifest.record(payload, primary_path)
         log("Manifest updated: %s" % csv_path)
+        manifest_ok = True
     except Exception as exc:
         log("WARNING: manifest NOT updated for %s: %s" % (primary_path, exc))
+
+    # ── Release the package (2026-09-29) ─────────────────────────────────────
+    # When buf builds in _ingest the package folder is dotted until complete.
+    # Dropping the dot is what hands it to the _ingest watcher, so it happens
+    # last, and never for a package missing its manifest. On failure the
+    # dotted folder is left in place (hidden from the watcher, still counted
+    # by the numbering) and the flag retries into a new package.
+    package_dir = os.path.dirname(os.path.dirname(primary_path))
+    if os.path.basename(package_dir).startswith(buf_submission.BUILDING_PREFIX):
+        if not manifest_ok:
+            log("ERROR: package NOT released (no manifest), left as %s "
+                "-- flag left in place for retry" % package_dir)
+            return False
+        released = None
+        for attempt in range(3):
+            try:
+                released = buf_submission.publish(package_dir)
+                break
+            except FileExistsError as exc:
+                log("ERROR: %s" % exc)
+                break
+            except OSError as exc:
+                log("WARNING: release attempt %d failed for %s: %s"
+                    % (attempt + 1, package_dir, exc))
+                time.sleep(2)
+        if released is None:
+            log("ERROR: package NOT released, left as %s -- flag left in "
+                "place for retry" % package_dir)
+            return False
+        log("Released to _ingest: %s" % released)
 
     # ── Mark processed ───────────────────────────────────────────────────────
     mark_processed(flag_path)

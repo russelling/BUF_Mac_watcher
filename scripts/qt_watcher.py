@@ -677,8 +677,23 @@ def process_flag(tk, sg, flag_path):
     # that on the Version itself, or in a side file that does not travel with
     # the delivery.
     manifest_ok = False
+
+    # Vendor Code names the in-house artist as ShotGrid shows them
+    # (2026-10-15). Resolved outside the manifest's try so a ShotGrid
+    # problem can never cost the manifest, and with it the release. A
+    # miss is a WARNING: the row then says "INH", the thing this replaced.
     try:
-        csv_path = buf_manifest.record(payload, primary_path)
+        artist, artist_how = buf_sg.artist_name(sg, payload)
+    except Exception as exc:
+        artist, artist_how = None, "lookup raised: %s" % exc
+    if artist:
+        log("Manifest artist: %s (from %s)" % (artist, artist_how))
+    else:
+        log("WARNING: manifest artist not resolved (%s) -- Vendor Code "
+            "stays %s" % (artist_how, payload.vendor_code or "INH"))
+
+    try:
+        csv_path = buf_manifest.record(payload, primary_path, artist=artist)
         log("Manifest updated: %s" % csv_path)
         manifest_ok = True
     except Exception as exc:

@@ -1,0 +1,20 @@
+# Runtime dependencies for resolve_bridge/. Nothing here is a hard import at
+# module load time (see qt_bake_import.py / resolve_api.py / sg_playlist.py)
+# so the package still imports without these installed - they're only
+# needed to actually RUN a push.
+
+# ShotGrid / Flow Production Tracking API. Either is enough:
+#   - shotgun-api3, if connecting with a script key (SG_SITE / SG_SCRIPT_NAME
+#     / SG_SCRIPT_KEY env vars)
+#   - tk-core (sgtk), if bootstrapping against the Toolkit pipeline config
+#     (SG_TOOLKIT_CONFIG_PATH) — this ships with the Flow Desktop app's
+#     bundled Python already, see ../WATCHER_PREREQUISITES.md
+shotgun-api3>=3.4.0
+
+# DaVinci Resolve's own Python scripting module (DaVinciResolveScript.py)
+# ships with DaVinci Resolve STUDIO — it is not a pip package. See
+# resolve_bridge/README.md for the RESOLVE_SCRIPT_API / RESOLVE_SCRIPT_LIB
+# environment variables that put it on sys.path.
+
+# Dev / test only:
+pytest>=7.0

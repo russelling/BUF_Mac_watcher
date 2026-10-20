@@ -154,6 +154,14 @@ class ReflagDialog(QDialog):
         form.addRow(self._key("SUBMITTED FOR"), self.submitted_combo)
         form.addRow(self._key("ARTIST"), self.artist_edit)
         form.addRow(self._key("DESCRIPTION"), self.description_edit)
+        # Anamorphic override (2026-10-19). Auto writes no key; the bake
+        # then decides from the camera plate. See flag_builder.framing_source.
+        self.framing_combo = QComboBox()
+        self.framing_combo.setMinimumHeight(28)
+        for label, value in fb.FRAMING_CHOICES:
+            self.framing_combo.addItem(label, value)
+        self.framing_combo.currentIndexChanged.connect(self._on_framing_changed)
+        form.addRow(self._key("FRAMING"), self.framing_combo)
         outer.addLayout(form)
 
         outer.addSpacing(16)
@@ -186,6 +194,7 @@ class ReflagDialog(QDialog):
 
         self.cdl_dot, self.cdl_detail = lamp_row(0, "CDL")
         self.lut_dot, self.lut_detail = lamp_row(1, "LUT")
+        self.frame_dot, self.frame_detail = lamp_row(2, "FRAME")
         outer.addLayout(colour)
 
         outer.addSpacing(14)
@@ -271,8 +280,10 @@ class ReflagDialog(QDialog):
 
     def _clear_lamps(self):
         self.colour = None
+        self.framing = None
         for dot, detail in ((self.cdl_dot, self.cdl_detail),
-                            (self.lut_dot, self.lut_detail)):
+                            (self.lut_dot, self.lut_detail),
+                            (self.frame_dot, self.frame_detail)):
             dot.setStyleSheet("color: %s;" % theme.INK_FAINT)
             detail.setText("—")
 
@@ -293,6 +304,33 @@ class ReflagDialog(QDialog):
                                         entry["detail"]))
             dot.setToolTip(entry["path"] or entry["detail"])
             detail.setToolTip(entry["path"] or entry["detail"])
+
+    # -- Framing lamp --------------------------------------------------------
+
+    def _refresh_framing(self):
+        """
+        Ask the bake whether this render will bake anamorphic or spherical.
+
+        Per RENDER, unlike CDL/LUT: the answer depends on the render's own
+        size and PAR as well as the plate, and on the FRAMING choice.
+        """
+        self.framing = fb.framing_source(
+            fb.color_probe_data(self.fields), self.current_render(),
+            self.framing_combo.currentData())
+        status = self.framing["status"]
+        self.frame_dot.setStyleSheet("color: %s;" % LAMP[status])
+        text = self.framing["detail"]
+        if status == "unknown":
+            text = "%s   %s" % (LAMP_WORD["unknown"], text)
+        self.frame_detail.setText(text)
+        tip = "\n".join(self.framing["notes"]) or text
+        self.frame_dot.setToolTip(tip)
+        self.frame_detail.setToolTip(tip)
+
+    def _on_framing_changed(self, *_):
+        if self.current_render():
+            self._refresh_framing()
+            self._update_preview()
 
     # -- Cascade -------------------------------------------------------------
 
@@ -418,11 +456,13 @@ class ReflagDialog(QDialog):
             self.render_combo.addItem(fb.describe_render(r), r)
         self.render_combo.blockSignals(False)
         self.render_combo.setCurrentIndex(0)   # newest version
+        self._refresh_framing()
         self._reset_range()                    # also repaints the preview
 
     # -- Frame range ---------------------------------------------------------
 
     def _on_render_changed(self, *_):
+        self._refresh_framing()
         self._reset_range()
 
     def _reset_range(self):
@@ -515,6 +555,16 @@ class ReflagDialog(QDialog):
                     "No LUT at all — the bake falls back to a generic display "
                     "transform and the look will not match the show."
                 )
+        framing = getattr(self, "framing", None)
+        if framing and framing["status"] == "warn":
+            lines.extend("Framing: %s" % n for n in framing["notes"])
+        if self.framing_combo.currentData() is not None:
+            lines.append("Framing is FORCED to %s for this bake (flag key "
+                         "\"anamorphic\": %s)."
+                         % ("anamorphic" if self.framing_combo.currentData()
+                            else "spherical",
+                            "true" if self.framing_combo.currentData()
+                            else "false"))
         if os.path.exists(flag_path):
             lines.append(
                 "A flag is already sitting here unprocessed — writing will "
@@ -559,6 +609,7 @@ class ReflagDialog(QDialog):
             cut_out=cut_out,
             frame_first=first,
             frame_last=last,
+            anamorphic=self.framing_combo.currentData(),
         )
 
         problems = fb.validate_flag(data)
@@ -587,8 +638,9 @@ class ReflagDialog(QDialog):
 
         colour_note = ""
         if self.colour:
-            colour_note = "\n\nCDL: %s\nLUT: %s" % (
-                self.cdl_detail.text(), self.lut_detail.text())
+            colour_note = "\n\nCDL: %s\nLUT: %s\nFRAME: %s" % (
+                self.cdl_detail.text(), self.lut_detail.text(),
+                self.frame_detail.text())
 
         QMessageBox.information(
             self, "Flag written",

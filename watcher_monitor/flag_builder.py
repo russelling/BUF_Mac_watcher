@@ -179,7 +179,7 @@ def check_range(render, first, last):
 def build_flag_data(shot, task, step, render, submitted_for, description,
                     episode, scene, project=None, artist=DEFAULT_ARTIST,
                     user_id=None, cut_in=None, cut_out=None,
-                    frame_first=None, frame_last=None):
+                    frame_first=None, frame_last=None, anamorphic=None):
     """
     Assemble the flag payload.
 
@@ -192,7 +192,7 @@ def build_flag_data(shot, task, step, render, submitted_for, description,
     reads the real timecode out of the first EXR when the flag carries none,
     which beats anything that could be guessed here.
     """
-    return {
+    data = {
         "type": "shot",
         "project_id": (project or {}).get("id"),
         "project_name": (project or {}).get("name"),
@@ -222,6 +222,11 @@ def build_flag_data(shot, task, step, render, submitted_for, description,
         "description": description or "Re-run from QT Watcher monitor.",
         "task_id": (task or {}).get("id"),
     }
+    # FRAMING override (2026-10-19). Only written when someone chose; an
+    # absent key is what tells the bake to detect from the plate.
+    if anamorphic is not None:
+        data["anamorphic"] = bool(anamorphic)
+    return data
 
 
 def validate_flag(data):
@@ -378,6 +383,78 @@ def color_sources(data):
                       "display transform, look will differ",
         }
 
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Framing (anamorphic or spherical), answered by the bake itself
+# ---------------------------------------------------------------------------
+
+# (label, flag value). None = write no key at all, so the bake detects it.
+FRAMING_CHOICES = (
+    ("Auto — from the camera plate", None),
+    ("Anamorphic (1.22x blow-up)", True),
+    ("Spherical (no blow-up)", False),
+)
+
+
+def framing_source(data, render, anamorphic=None):
+    """
+    What the bake will decide about de-squeeze and blow-up for this render.
+
+    Calls qt_bake_oiio.resolve_anamorphic() on the render's first frame -
+    the same function the bake runs - with the FRAMING choice applied, so
+    the lamp cannot disagree with the QT.
+
+    Returns {"status", "detail", "notes", "anamorphic", "squeeze"} with
+    status "ok" (clean decision), "warn" (decided, but the bake had to
+    overrule or guess - say why) or "unknown" (could not run). Never raises.
+    """
+    import contextlib
+    import io
+
+    result = {"status": "unknown", "detail": "", "notes": [],
+              "anamorphic": None, "squeeze": None}
+    if not render:
+        result["detail"] = "no render selected"
+        return result
+    try:
+        bake = _bake_module()
+        resolve = bake.resolve_anamorphic
+    except Exception as exc:
+        result["detail"] = ("bake has no anamorphic detection (%s) - apply "
+                            "patch_anamorphic_detect_2026_10_19.py" % exc)
+        return result
+
+    probe = dict(data)
+    if anamorphic is not None:
+        probe["anamorphic"] = bool(anamorphic)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            first_exr = bake.frame_path(render["exr_path_pattern"],
+                                        render["frame_first"])
+            meta = bake.read_squeeze_metadata(first_exr)
+            decision = resolve(probe, meta["width"], meta["height"],
+                               meta["par"] or 1.0)
+    except Exception as exc:
+        result["detail"] = "lookup failed: %s" % exc
+        return result
+
+    words = {"plate": "from the camera plate", "flag": "forced by FRAMING",
+             "render": "no plate found - from the render's PAR"}
+    detail = "%s   %s · de-squeeze %.3gx" % (
+        "ANAMORPHIC" if decision["anamorphic"] else "SPHERICAL",
+        words.get(decision["source"], decision["source"]),
+        decision["squeeze"])
+    if decision["anamorphic"]:
+        detail += " · %.2fx blow-up" % bake.ANAMORPHIC_BLOWUP
+    result.update(
+        status="warn" if decision["warn"] else "ok",
+        detail=detail,
+        notes=[n.replace("WARNING: ", "") for n in decision["notes"][1:]],
+        anamorphic=decision["anamorphic"],
+        squeeze=decision["squeeze"],
+    )
     return result
 
 

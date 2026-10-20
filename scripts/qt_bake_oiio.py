@@ -276,8 +276,8 @@ MASK_OPACITY = 0.5
 #
 # Anamorphic shots are scaled up by this factor about the centre before being
 # placed in the delivery frame, so the QT shows the extraction rather than the
-# full captured width. Applied ONLY when a de-squeeze happened (PAR != 1.0 on
-# the first EXR) - see the call to framing_plan() in bake_sequence().
+# full captured width. Applied to shots resolve_anamorphic() calls
+# anamorphic - from the camera plate, or the flag's "anamorphic" override.
 #
 # 1.22 puts 211px off each side of a 1920-wide frame. What it does to the top
 # and bottom depends on the source aspect - see framing_plan().
@@ -1191,6 +1191,318 @@ def source_colorspace(data):
     return OCIO_SOURCE_SHOT, "shot default"
 
 
+# ---------------------------------------------------------------------------
+# Anamorphic detection (2026-10-19)
+# ---------------------------------------------------------------------------
+#
+# Two separate questions, which used to be answered by one number:
+#
+#   1. DE-SQUEEZE - how much wider than tall is each pixel of THIS render?
+#      A fact about the pixels on disk. Wrong answer = a squashed or
+#      stretched picture.
+#   2. ANAMORPHIC - was the shot captured through an anamorphic lens, so the
+#      QT should show the extraction (the 1.22x blow-up)? A fact about the
+#      SHOT. Wrong answer = the wrong crop.
+#
+# Until now both came from the render's PixelAspectRatio. That breaks the
+# moment a comp writes squeezed pixels in a format whose PAR is 1.0 - which
+# is exactly what 303_001_0040 / 0250 and 303_007_0040 / 0060 did on
+# 2026-10-16 (a custom 4608x3164 format with PAR 1): no de-squeeze, so the
+# picture came out squashed, AND no blow-up.
+#
+# The camera plate is the better witness. Every ALEXA 35 plate on this show
+# says what it is: 4608x3164 plates carry PixelAspectRatio 2.0 and
+# lensSqueezeFactor 2/1, every 16:9 plate carries 1.0. (lensModel is NOT
+# usable - "Panavision C" appears on spherical plates too.)
+#
+# So:
+#   ANAMORPHIC  = the plate's squeeze > 1
+#   DE-SQUEEZE  = whichever of {render PAR, plate squeeze, 1.0} makes the
+#                 render's picture the plate's picture shape. That one rule
+#                 covers a correctly-tagged render (render PAR wins), a
+#                 squeezed render tagged PAR 1 (plate squeeze wins) and a
+#                 render the artist already de-squeezed (1.0 wins).
+#   If none of the three fits - the render is some other extraction - the
+#   render's own PAR is used and the log says so loudly.
+#
+# With no readable plate (assets, shots with no plates/) everything falls
+# back to the render's PAR, exactly as before.
+#
+# MANUAL OVERRIDE - flag keys, both optional:
+#   "anamorphic": true | false   forces the blow-up on or off. Absent, null
+#                                or "auto" means detect.
+#   "squeeze":    <number>       forces the de-squeeze factor for this
+#                                render's pixels (1.0 = none). Rarely
+#                                needed; "anamorphic" alone is the normal
+#                                override.
+
+# Squeeze assumed when a flag forces anamorphic but neither the render nor a
+# plate says how squeezed it is. Every anamorphic plate on Lucid S3 is 2x.
+ANAMORPHIC_DEFAULT_SQUEEZE = 2.0
+
+# Two picture shapes "match" within this relative difference. 4608x3164 at
+# PAR 2 is 2.913:1; the nearest wrong answer (PAR 1) is 1.456:1, so 3% is
+# far from ambiguous while still forgiving odd-pixel rounding.
+ASPECT_MATCH_TOLERANCE = 0.03
+
+# Element folders under plates/ that are never the camera plate.
+PLATE_SKIP_DIRS = ("roto", "test", "tests", "jpg", "ref")
+
+
+def read_squeeze_metadata(exr_path):
+    """
+    Everything the anamorphic decision needs from one EXR, in ONE oiiotool
+    call: {"width", "height", "par", "lens_squeeze"}.
+
+    width/height are the DISPLAY window (see read_resolution). par is None
+    when the file carries no PixelAspectRatio; lens_squeeze is None when it
+    carries no lensSqueezeFactor (ARRI writes it as a rational, "2/1",
+    which oiiotool prints as "2/1 (2)").
+    """
+    out = {"width": None, "height": None, "par": None, "lens_squeeze": None}
+    try:
+        result = subprocess.run(
+            [OIIOTOOL, "--info", "-v", exr_path],
+            capture_output=True, text=True
+        )
+    except Exception as e:
+        print("[qt_bake_oiio] WARNING: could not read %s: %s" % (exr_path, e))
+        return out
+    text = result.stdout
+    m = (re.search(r"full/display size:\s*(\d+)\s*x\s*(\d+)", text)
+         or re.search(r"(\d+)\s*x\s*(\d+)", text))
+    if m:
+        out["width"], out["height"] = int(m.group(1)), int(m.group(2))
+    for line in text.splitlines():
+        key, _, value = line.strip().partition(":")
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "pixelaspectratio":
+            out["par"] = _positive_number(value)
+        elif key.endswith("lenssqueezefactor"):
+            out["lens_squeeze"] = _positive_number(value)
+    return out
+
+
+def _positive_number(text):
+    """'2', '2.0', '2/1', '2/1 (2)' -> 2.0. None if not a positive number."""
+    text = (text or "").split("(")[0].strip().strip('"')
+    try:
+        if "/" in text:
+            num, den = text.split("/", 1)
+            value = float(num) / float(den)
+        else:
+            value = float(text)
+    except (ValueError, ZeroDivisionError):
+        return None
+    return value if value > 0 else None
+
+
+def find_plate_frame(data):
+    """
+    One EXR from this shot's camera plate, or None.
+
+    Same plates/ folder and the same BG-first element order the CDL and LUT
+    lookups use (shot_plates_dir, _element_dirs), so the plate that decides
+    the framing is the plate that decides the grade. Inside an element the
+    frames sit either loose or one level down in a resolution folder
+    (plates/<shot>_BG01_V001/4608x3164/...); both are searched.
+    """
+    if not is_shot_context(data):
+        return None
+    plates_dir = shot_plates_dir(data)
+    if not plates_dir or not os.path.isdir(plates_dir):
+        return None
+    for element_dir in _element_dirs(plates_dir, data.get("shot_code", "")):
+        if os.path.basename(element_dir).lower() in PLATE_SKIP_DIRS:
+            continue
+        found = _first_with_extension(element_dir, (".exr",))
+        if found:
+            return found
+        try:
+            subdirs = sorted(
+                n for n in os.listdir(element_dir)
+                if not n.startswith(".")
+                and n.lower() not in PLATE_SKIP_DIRS
+                and os.path.isdir(os.path.join(element_dir, n))
+            )
+        except OSError:
+            continue
+        for sub in subdirs:
+            found = _first_with_extension(os.path.join(element_dir, sub), (".exr",))
+            if found:
+                return found
+    return None
+
+
+def _plate_squeeze(meta, path, notes):
+    """
+    Read a plate's two squeeze statements and reconcile them.
+
+    Returns {"path", "width", "height", "squeeze", "lens", "lens_why", "warn"}
+    or None if the plate's size is unreadable.
+
+      squeeze  how squeezed the plate's PIXELS are - sets the picture shape
+               the render is measured against.
+      lens     whether the LENS was anamorphic - sets the blow-up.
+
+    On every Lucid plate so far the two agree (PAR 2.0 with 2/1, or 1.0 with
+    1/1). EXR always carries a PixelAspectRatio, so a conversion tool that
+    drops it leaves 1.0 behind while ARRI's lensSqueezeFactor survives; when
+    they disagree the lens factor wins for the blow-up, and for the pixels
+    the raster's shape decides: narrower than 2:1 can only be squeezed (a
+    de-squeezed anamorphic frame is always wider).
+    """
+    w, h, par, lens = meta["width"], meta["height"], meta["par"], meta["lens_squeeze"]
+    if not (w and h):
+        return None
+    par = par or 1.0
+    warn = False
+    squeeze = par
+    if lens is None:
+        lens_value, lens_why = par, "PAR %.3g, no lensSqueezeFactor" % par
+    else:
+        lens_value, lens_why = lens, "lens squeeze %.3g, PAR %.3g" % (lens, par)
+        if abs(par - lens) > 1e-3:
+            warn = True
+            if abs(par - 1.0) <= 1e-3 and lens > 1.0 and w / float(h) < 2.0:
+                squeeze = lens
+                notes.append(
+                    "WARNING: plate %dx%d says PAR 1 but lensSqueezeFactor %.3g, "
+                    "and is narrower than 2:1 - treating its pixels as %.3gx "
+                    "squeezed" % (w, h, lens, lens))
+            else:
+                notes.append(
+                    "WARNING: plate PixelAspectRatio %.3g disagrees with its "
+                    "lensSqueezeFactor %.3g; pixels taken from the PAR, the "
+                    "blow-up from the lens" % (par, lens))
+    return {"path": path, "width": w, "height": h, "squeeze": squeeze,
+            "lens": lens_value, "lens_why": lens_why, "warn": warn}
+
+
+def _override_anamorphic(data):
+    """The flag's "anamorphic" key as True / False / None (= detect)."""
+    value = data.get("anamorphic")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("true", "yes", "1", "anamorphic", "on"):
+            return True
+        if lowered in ("false", "no", "0", "spherical", "off"):
+            return False
+    return None
+
+
+def _aspects_match(a, b):
+    return a and b and abs(a - b) / b <= ASPECT_MATCH_TOLERANCE
+
+
+def resolve_anamorphic(data, src_w, src_h, render_par, plate_path="auto"):
+    """
+    Decide de-squeeze and blow-up for one render. See the section comment.
+
+    src_w/src_h are the render's display window; render_par its PAR (1.0
+    when absent). plate_path is a plate EXR, None for "no plate", or "auto"
+    to look it up with find_plate_frame().
+
+    Returns a dict:
+        squeeze     float, the de-squeeze factor for the render's pixels
+        anamorphic  bool, whether the blow-up applies
+        source      short word for where the answer came from, for logs and
+                    the RE-RUN lamp: "flag", "plate", "render"
+        notes       list of human-readable lines, logged in order
+        warn        True when the decision had to guess
+        plate       see _plate_squeeze(), or None
+    """
+    render_par = render_par if render_par and render_par > 0 else 1.0
+    notes = []
+    warn = False
+
+    plate = None
+    if plate_path == "auto":
+        plate_path = find_plate_frame(data)
+    if plate_path:
+        meta = read_squeeze_metadata(plate_path)
+        plate = _plate_squeeze(meta, plate_path, notes)
+        if plate is None:
+            notes.append("plate %s unreadable; ignoring it" % plate_path)
+        elif plate["warn"]:
+            warn = True
+
+    forced_anamorphic = _override_anamorphic(data)
+    forced_squeeze = _positive_number(str(data.get("squeeze") or ""))
+
+    # -- De-squeeze ----------------------------------------------------------
+    squeeze = render_par
+    squeeze_why = "render PAR %.3g" % render_par
+    measurable = bool(src_w and src_h)
+    if forced_squeeze:
+        squeeze = forced_squeeze
+        squeeze_why = "flag squeeze=%.3g" % forced_squeeze
+    elif (plate and measurable
+          and len({round(render_par, 3), round(plate["squeeze"], 3), 1.0}) > 1):
+        # Only a question when something is not 1.0 - a square-pixel render
+        # of a spherical plate has nothing to decide, so it is not measured
+        # (and a reformatted spherical render does not raise a warning).
+        target = plate["width"] * plate["squeeze"] / float(plate["height"])
+        fits = [c for c in (render_par, plate["squeeze"], 1.0)
+                if _aspects_match(src_w * c / float(src_h), target)]
+        if fits:
+            squeeze = fits[0]
+            if abs(squeeze - render_par) > 1e-3:
+                squeeze_why = ("plate: render is %dx%d tagged PAR %.3g, but "
+                               "only a %.3gx de-squeeze gives the plate's "
+                               "%.3f:1 picture"
+                               % (src_w, src_h, render_par, squeeze, target))
+                notes.append("WARNING: render PAR is wrong for its pixels - "
+                             + squeeze_why)
+                warn = True
+            else:
+                squeeze_why = "render PAR %.3g, agrees with plate" % render_par
+        else:
+            notes.append(
+                "WARNING: render %dx%d (PAR %.3g) matches no de-squeeze of the "
+                "plate's %dx%d (squeeze %.3g); trusting the render PAR"
+                % (src_w, src_h, render_par, plate["width"], plate["height"],
+                   plate["squeeze"]))
+            warn = True
+    elif (not plate and forced_anamorphic and measurable
+          and abs(render_par - 1.0) <= 1e-3):
+        # Forced anamorphic, nothing says how squeezed: a raster narrower
+        # than 2:1 can only be squeezed (a de-squeezed anamorphic frame is
+        # always wider), so de-squeeze it by the show default.
+        if src_w / float(src_h) < 2.0:
+            squeeze = ANAMORPHIC_DEFAULT_SQUEEZE
+            squeeze_why = ("flag anamorphic, %dx%d is narrower than 2:1 so "
+                           "treated as squeezed %.3gx (show default)"
+                           % (src_w, src_h, squeeze))
+            notes.append("WARNING: no plate to confirm the squeeze - "
+                         + squeeze_why)
+            warn = True
+
+    # -- Blow-up -------------------------------------------------------------
+    if forced_anamorphic is not None:
+        anamorphic = forced_anamorphic
+        source = "flag"
+        why = "flag anamorphic=%s" % ("true" if anamorphic else "false")
+    elif plate:
+        anamorphic = plate["lens"] > 1.0 + 1e-3
+        source = "plate"
+        why = "plate %s (%s)" % (plate["lens_why"],
+                                 os.path.basename(plate["path"]))
+    else:
+        anamorphic = abs(squeeze - 1.0) > 1e-3
+        source = "render"
+        why = "no plate; render PAR %.3g" % render_par
+
+    notes.insert(0, "%s (%s); de-squeeze %.3gx (%s)"
+                 % ("ANAMORPHIC" if anamorphic else "SPHERICAL", why,
+                    squeeze, squeeze_why))
+    return {"squeeze": squeeze, "anamorphic": anamorphic, "source": source,
+            "notes": notes, "warn": warn, "plate": plate}
+
+
 def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
                desqueeze_to=None, frame_args=None, apply_log_convert=True,
                apply_cdl=True, apply_lut_stage=True, source_space=None):
@@ -1889,17 +2201,32 @@ def bake_sequence(data, output_paths):
     src_w, src_h = read_resolution(first_exr)
     par = read_pixel_aspect(first_exr)
     desqueeze_to = None
+    # De-squeeze and blow-up are decided together but separately - see
+    # resolve_anamorphic(). If the decision itself fails, fall back to the
+    # render's own PAR (the pre-2026-10-19 behaviour), and say so.
+    try:
+        anamorphic = resolve_anamorphic(data, src_w, src_h, par)
+    except Exception as exc:
+        print("[qt_bake_oiio] Anamorphic: ERROR deciding (%s) - falling back "
+              "to the render PAR %.4f for both de-squeeze and blow-up"
+              % (exc, par))
+        anamorphic = {"squeeze": par, "anamorphic": abs(par - 1.0) > 1e-3,
+                      "source": "render", "notes": [], "warn": True,
+                      "plate": None}
+    for line in anamorphic["notes"]:
+        print("[qt_bake_oiio] Anamorphic: %s" % line)
+    squeeze = anamorphic["squeeze"]
     if src_w is None or src_h is None:
         print("[qt_bake_oiio] Resolution: could not read; no de-squeeze applied")
-    elif par and abs(par - 1.0) > 1e-3:
-        new_h = int(round(src_h / par))
+    elif squeeze and abs(squeeze - 1.0) > 1e-3:
+        new_h = int(round(src_h / squeeze))
         print(
-            "[qt_bake_oiio] Anamorphic: PAR=%.4f, de-squeezing %dx%d -> %dx%d "
-            "(height/PAR, Lanczos3)" % (par, src_w, src_h, src_w, new_h)
+            "[qt_bake_oiio] De-squeeze: %.4fx, %dx%d -> %dx%d "
+            "(height/squeeze, Lanczos3)" % (squeeze, src_w, src_h, src_w, new_h)
         )
         desqueeze_to = (src_w, new_h)
     else:
-        print("[qt_bake_oiio] PAR=1.0 (square pixels); no de-squeeze")
+        print("[qt_bake_oiio] De-squeeze: none (square pixels)")
 
     # All QTs deliver at this fixed size, filling it horizontally. The
     # geometry is decided once here (from the first frame, post-de-squeeze)
@@ -1907,11 +2234,11 @@ def bake_sequence(data, output_paths):
     # sequence is framed identically.
     out_w, out_h = DELIVERY_WIDTH, DELIVERY_HEIGHT
     frame_src_w, frame_src_h = desqueeze_to if desqueeze_to else (src_w, src_h)
-    # Anamorphic shots only: the de-squeeze already told us PAR != 1.0, which
-    # is the same signal. A shot delivered with square pixels gets no blow-up
-    # even if it was shot anamorphic - if that ever happens, the flag needs to
-    # carry the fact explicitly rather than it being inferred here.
-    blowup = ANAMORPHIC_BLOWUP if desqueeze_to is not None else 1.0
+    # Anamorphic shots only. Decided by resolve_anamorphic() from the camera
+    # plate (or the flag's "anamorphic" override), NOT from whether a
+    # de-squeeze happened: a render the artist already de-squeezed has square
+    # pixels and still needs the blow-up.
+    blowup = ANAMORPHIC_BLOWUP if anamorphic["anamorphic"] else 1.0
     frame_args, framing_note = framing_plan(
         frame_src_w, frame_src_h, out_w, out_h, blowup=blowup
     )

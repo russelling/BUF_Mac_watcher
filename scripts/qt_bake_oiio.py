@@ -108,14 +108,54 @@ SHOW_LUT_DIR = (
 # to be missing from this table entirely, which meant a ZR render fell through
 # to the ARRI default and baked the wrong look while only logging a warning.
 # shows/lucid_s3.yml maps it the same way; keep the two in step.
+# CAMERA_LOG_SPACE_2026_10_27: each alias set is named once and shared by
+# SHOW_LUTS_BY_CAMERA and CAMERA_LOG_SPACES below, so the two cannot drift.
+CAMERA_ALIASES_ARRI = ("arri", "alexa", "alexa35", "alexa 35", "logc4",
+                       "arrilogc4")
+CAMERA_ALIASES_RED = ("red", "log3g10", "redlog3g10",
+                      "nikon", "zr", "nikonzr", "nikon zr")
+CAMERA_ALIASES_SONY = ("sony", "venice", "slog3", "sonyslog3")
+# DJI Zenmuse X5S / X7 -- D-Log on D-Gamut (the "DJI Cinema Color System").
+# DJI's D-Log/D-Gamut white paper states the curve against the X5S. The
+# ORIGINAL Inspire 1 Zenmuse X5 shot an earlier D-Log with no D-Gamut; if a
+# plate is from that camera, this mapping is an approximation -- check it.
+CAMERA_ALIASES_DJI = ("dji", "dlog", "d-log", "djidlog", "dji dlog",
+                      "dji d-log", "zenmuse", "x5", "x5s", "zenmusex5",
+                      "zenmuse x5", "zenmusex5s", "zenmuse x5s")
+
 SHOW_LUTS_BY_CAMERA = {
-    ("arri", "alexa", "alexa35", "alexa 35", "logc4", "arrilogc4"):
+    CAMERA_ALIASES_ARRI:
         "Buffalo_V4_LUT_20260720/ARRILogC4_SEV_S3_V4_R709.cube",
-    ("red", "log3g10", "redlog3g10",
-     "nikon", "zr", "nikonzr", "nikon zr"):
+    CAMERA_ALIASES_RED:
         "Buffalo_V4_LUT_20260720/REDLog3G10RWG_SEV_S3_V4_R709.cube",
-    ("sony", "venice", "slog3", "sonyslog3"):
+    CAMERA_ALIASES_SONY:
         "Slog3SG3CV_gm5_SEV_S3_V4_R709.cube",
+    # DJI's own technical "D-Log to Rec709" 33^3 LUT (DJI download, 2017).
+    # It is NOT the show look -- there is no DJI version of the V4 package.
+    # A shot that should carry the show look instead can set show_lut_path.
+    CAMERA_ALIASES_DJI:
+        "D-Log to Rec709.cube",
+}
+
+# Camera -> the log space the CDL and LUT are applied in. Each show LUT
+# expects its OWN camera's log; until 2026-10-27 every camera got LogC4.
+# Measured with the real .cube files, ACES 18% grey -> Rec.709 code value:
+#
+#                       fed LogC4     fed its own log
+#   ARRI  V4 LUT          0.336           0.336
+#   RED   V4 LUT          0.185           0.337
+#   Sony  V4 LUT          0.097           0.336
+#   DJI   D-Log LUT       0.194           0.401   (DJI's look, not the show's)
+#
+# So the RED/Sony rows were one to two stops dark whenever "camera" was set.
+# Nothing wrote "camera" into a flag at the time, so no QT was affected.
+# These are ocio://studio-config-latest aliases (v4.0.0 under OCIO 2.5);
+# dlog_dgamut does not exist in configs older than v4.0.0.
+CAMERA_LOG_SPACES = {
+    CAMERA_ALIASES_ARRI: "arri_logc4",
+    CAMERA_ALIASES_RED:  "log3g10_redwidegamutrgb",
+    CAMERA_ALIASES_SONY: "slog3_sgamut3cine",
+    CAMERA_ALIASES_DJI:  "dlog_dgamut",
 }
 
 SHOW_LUT_PATH = os.path.join(
@@ -924,6 +964,27 @@ def resolve_show_lut(data):
     return SHOW_LUT_PATH, "default (ARRI)"
 
 
+def resolve_log_space(data):
+    """The log space the CDL and LUT are applied in, and why.
+
+    flag["log_space"] (an OCIO name) wins outright; else the flag's camera
+    through CAMERA_LOG_SPACES; else LogC4. Returns (space, reason).
+
+    It follows the CAMERA, not whichever LUT was picked: a per-shot LUT or
+    CDL on a DJI shot is taken to be authored in D-Log, like the camera LUT.
+    CAMERA_LOG_SPACE_2026_10_27
+    """
+    explicit = data.get("log_space")
+    if explicit:
+        return str(explicit), "from the flag's log_space"
+    camera = str(data.get("camera") or "").strip().lower()
+    if camera:
+        for aliases, space in CAMERA_LOG_SPACES.items():
+            if camera in aliases:
+                return space, "for camera '%s'" % camera
+    return OCIO_LOGC4, "default (ARRI)"
+
+
 def shot_plates_dir(data):
     """Absolute path to a shot's plates/ folder, or None for non-shot context.
 
@@ -1505,7 +1566,8 @@ def resolve_anamorphic(data, src_w, src_h, render_par, plate_path="auto"):
 
 def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
                desqueeze_to=None, frame_args=None, apply_log_convert=True,
-               apply_cdl=True, apply_lut_stage=True, source_space=None):
+               apply_cdl=True, apply_lut_stage=True, source_space=None,
+               log_space=None):
     """
     Apply the show color pipeline to a single EXR frame using oiiotool:
         ACEScg -> LogC4 -> CDL (optional) -> LUT -> Rec.709
@@ -1556,7 +1618,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
     # Step 1: ACEScg -> LogC4 via OCIO
     if apply_log_convert:
         cmd += ["--colorconvert", source_space or OCIO_SOURCE_SHOT,
-                OCIO_LOGC4]
+                log_space or OCIO_LOGC4]
 
     # Step 2: CDL if present (caller has already decided and logged).
     if want_cdl:
@@ -1568,7 +1630,7 @@ def bake_frame(src_exr, dst_png, cdl_path=None, lut_path=None,
         cmd += ["--ociofiletransform", lut_path]
     elif use_display:
         cmd += [
-            "--ociodisplay:from=%s" % OCIO_LOGC4,
+            "--ociodisplay:from=%s" % (log_space or OCIO_LOGC4),
             OCIO_REC709_DISPLAY,
             OCIO_REC709_VIEW,
         ]
@@ -1610,7 +1672,7 @@ def passthrough_frame(src_path, dst_png, desqueeze_to=None, frame_args=None):
 
 def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
                     apply_log_convert=True, apply_cdl=True, apply_lut_stage=True,
-                    crop_to=None, source_space=None):
+                    crop_to=None, source_space=None, log_space=None):
     """
     Same color stages as bake_frame (ACEScg -> LogC4 -> CDL -> LUT ->
     Rec.709), but for a small slate collage print rather than a delivery
@@ -1647,7 +1709,7 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
 
     if apply_log_convert:
         cmd += ["--colorconvert", source_space or OCIO_SOURCE_SHOT,
-                OCIO_LOGC4]
+                log_space or OCIO_LOGC4]
 
     if want_cdl:
         cmd += ["--ociofiletransform", cdl_path]
@@ -1656,7 +1718,7 @@ def bake_thumbnail(src_exr, dst_png, cdl_path, lut_path, desqueeze_to, size,
         cmd += ["--ociofiletransform", lut_path]
     elif use_display:
         cmd += [
-            "--ociodisplay:from=%s" % OCIO_LOGC4,
+            "--ociodisplay:from=%s" % (log_space or OCIO_LOGC4),
             OCIO_REC709_DISPLAY,
             OCIO_REC709_VIEW,
         ]
@@ -1812,10 +1874,24 @@ def build_drawtext_filters(data, frame_offset, start_tc,
     # Bottom center: source frame number
     # n = ffmpeg's 0-based output frame index; add frame_offset to recover the
     # real source frame number (slate is at index 0, first image frame -> first).
+    # STUDIO_QT_COUNTER_HANDLES_2026_10_28
+    # White inside the flag's cut_in..cut_out (the edit), yellow outside it
+    # (handles). fontcolor_expr builds 0xFFFFff / 0xFFFF00 per frame from the
+    # same n + frame_offset the counter prints. No usable cut -> white.
+    counter_color = "fontcolor=white"
+    try:
+        _cut_in, _cut_out = int(data.get("cut_in")), int(data.get("cut_out"))
+    except (TypeError, ValueError):
+        _cut_in = _cut_out = None
+    if is_shot and _cut_in is not None and _cut_out >= _cut_in:
+        counter_color = (
+            "fontcolor_expr='0xFFFF%%{eif\\:between(n+%d\\,%d\\,%d)*255\\:x\\:2}'"
+            % (frame_offset, _cut_in, _cut_out)
+        )
     filters.append(
         "drawtext=text='%%{eif\\:n+%d\\:d\\:4}':x=(w-tw)/2:y=h-%d-th:fontsize=%d"
-        ":fontcolor=white:box=1:boxcolor=black@0.4:boxborderw=4"
-        % (frame_offset, margin, font_size)
+        ":%s:box=1:boxcolor=black@0.4:boxborderw=4"
+        % (frame_offset, margin, font_size, counter_color)
     )
 
     # CDL / Show LUT status dots: a subtle row of small colored squares
@@ -1875,7 +1951,8 @@ def _esc_drawtext(s):
 def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                      tmpdir, exr_pattern, cdl_path, lut_path, desqueeze_to,
                      skip_color=False, apply_log_convert=True, apply_cdl=True,
-                     apply_lut_stage=True, thumb_crop=None, source_space=None):
+                     apply_lut_stage=True, thumb_crop=None, source_space=None,
+                     log_space=None):
     """
     Render a slate frame as a PNG: title + metadata text block over a black
     background, a row of three equal-size frame thumbnails (first/mid/last)
@@ -1986,6 +2063,7 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                 frame_path(exr_pattern, frame_first_actual), thumb1_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
                 crop_to=thumb_crop, source_space=source_space,
+                log_space=log_space,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
@@ -1993,6 +2071,7 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                 frame_path(exr_pattern, frame_mid_actual), thumb2_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
                 crop_to=thumb_crop, source_space=source_space,
+                log_space=log_space,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
@@ -2000,6 +2079,7 @@ def build_slate_png(data, dst_path, first, last, start_tc, width, height,
                 frame_path(exr_pattern, frame_last_actual), thumb3_png,
                 cdl_path, lut_path, desqueeze_to, SBS_SIZE,
                 crop_to=thumb_crop, source_space=source_space,
+                log_space=log_space,
                 apply_log_convert=apply_log_convert, apply_cdl=apply_cdl,
                 apply_lut_stage=apply_lut_stage,
             )
@@ -2133,8 +2213,11 @@ def bake_sequence(data, output_paths):
     # invisible on neutrals and wrong on everything saturated, so it does not
     # get to be a silent constant. See source_colorspace().
     src_space, src_why = source_colorspace(data)
-    print("[qt_bake_oiio] Source colourspace: %s (%s) -> %s"
-          % (src_space, src_why, OCIO_LOGC4))
+    # The CDL and LUT are applied in the CAMERA's log space (LogC4 for ARRI,
+    # D-Log for DJI, ...) -- see CAMERA_LOG_SPACES. Logged for the same reason.
+    log_space, log_why = resolve_log_space(data)
+    print("[qt_bake_oiio] Source colourspace: %s (%s) -> %s (%s)"
+          % (src_space, src_why, log_space, log_why))
 
     # CDL path (shots only — assets skip CDL). CDL is an optional creative
     # grade: if absent, skip it but log so it's visible that the QT is
@@ -2280,6 +2363,7 @@ def bake_sequence(data, output_paths):
                     desqueeze_to=desqueeze_to, frame_args=frame_args,
                     apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
                     apply_lut_stage=apply_lut_stage, source_space=src_space,
+                    log_space=log_space,
                 )
             baked_frames.append(dst)
 
@@ -2295,6 +2379,7 @@ def bake_sequence(data, output_paths):
                 tmpdir=tmpdir, exr_pattern=exr_pattern, cdl_path=cdl_path,
                 lut_path=lut_path, desqueeze_to=desqueeze_to,
                 thumb_crop=thumb_crop, source_space=src_space,
+                log_space=log_space,
                 skip_color=skip_color,
                 apply_log_convert=apply_log, apply_cdl=apply_cdl_stage,
                 apply_lut_stage=apply_lut_stage,

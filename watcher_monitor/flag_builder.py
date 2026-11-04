@@ -649,16 +649,73 @@ def human_user_id(tk, name):
     return None
 
 
+
+# STUDIO_QT_COUNTER_HANDLES_2026_10_28
+# sg_cut_in/out on Lucid S3 include the handles (per Mark, 2026-10-28). The
+# flag's cut_in/cut_out is the EDIT range - the QT frame counter is white
+# inside it and yellow on handles - so subtract the Shot fields displayed as
+# "Handles Head" / "Handles Tail". Their field codes are not recorded
+# anywhere, so they are found by DISPLAY NAME in the Shot schema (once per
+# process). Handles unknown -> (None, None): a plain white counter, never a
+# wrong one.
+HANDLES_HEAD_NAMES = ("Handles Head", "Head Handles")
+HANDLES_TAIL_NAMES = ("Handles Tail", "Tail Handles")
+_HANDLE_FIELD_CODES = {}
+
+
+def _handle_field_codes(sg):
+    """(head_code, tail_code) by display name; a failed read is not cached."""
+    if "codes" in _HANDLE_FIELD_CODES:
+        return _HANDLE_FIELD_CODES["codes"]
+    schema = sg.schema_field_read("Shot")
+    want_head = set(n.lower() for n in HANDLES_HEAD_NAMES)
+    want_tail = set(n.lower() for n in HANDLES_TAIL_NAMES)
+    head = tail = None
+    for code, info in sorted(schema.items()):
+        name = ((info.get("name") or {}).get("value") or "").strip().lower()
+        if name in want_head and head is None:
+            head = code
+        elif name in want_tail and tail is None:
+            tail = code
+    _HANDLE_FIELD_CODES["codes"] = (head, tail)
+    return head, tail
+
+
+def _edit_range(shot, head_f, tail_f, cut_in, cut_out):
+    """(edit_in, edit_out, note): cut in/out minus handles, or (None, None, why)."""
+    if cut_in is None or cut_out is None:
+        return None, None, "no cut in/out on the Shot"
+    if not head_f or not tail_f:
+        return None, None, "no Handles Head / Handles Tail field on Shot"
+    head, tail = shot.get(head_f), shot.get(tail_f)
+    if head in (None, "") or tail in (None, ""):
+        return None, None, "Handles Head/Tail empty on the Shot"
+    head, tail = int(float(head)), int(float(tail))
+    edit_in, edit_out = int(cut_in) + head, int(cut_out) - tail
+    if head < 0 or tail < 0 or edit_out < edit_in:
+        return None, None, "handles %d/%d do not fit cut %s-%s" % (
+            head, tail, cut_in, cut_out)
+    return edit_in, edit_out, "edit %d-%d (cut %s-%s, handles %d/%d)" % (
+        edit_in, edit_out, cut_in, cut_out, head, tail)
+
+
 def cut_range(tk, shot_id):
-    """(cut_in, cut_out) from the Shot, or (None, None)."""
+    """EDIT range (cut_in, cut_out) for the flag: the Shot's sg_cut_in/out
+    minus its handles, or (None, None) - see _edit_range()."""
     try:
-        shot = tk.shotgun.find_one("Shot", [["id", "is", shot_id]],
-                                   ["sg_cut_in", "sg_cut_out"])
-    except Exception:
+        head_f, tail_f = _handle_field_codes(tk.shotgun)
+        shot = tk.shotgun.find_one(
+            "Shot", [["id", "is", shot_id]],
+            ["sg_cut_in", "sg_cut_out"] + [f for f in (head_f, tail_f) if f])
+    except Exception as exc:
+        print("[flag_builder] cut range: Flow query failed: %s" % exc)
         return None, None
     if not shot:
         return None, None
-    return shot.get("sg_cut_in"), shot.get("sg_cut_out")
+    edit_in, edit_out, note = _edit_range(
+        shot, head_f, tail_f, shot.get("sg_cut_in"), shot.get("sg_cut_out"))
+    print("[flag_builder] cut range for Shot %s: %s" % (shot_id, note))
+    return edit_in, edit_out
 
 
 def write_flag(path, data, overwrite=False):

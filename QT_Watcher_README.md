@@ -68,9 +68,7 @@ launchctl unload ~/Library/LaunchAgents/com.buffalovfx.qtwatcher.plist
 2. In Terminal, run the installer script (it has no shebang, so invoke it
    with `bash`, not `./`):
 
-   ```bash
-   cd "/Volumes/atv-post-lucid3/atv-buffalo-s03/buffalo_vfx/repo/pipeline/config/flow/alts/BUF_Mac_watcher"
-   bash watcher_launch.txt
+   ```
    ```
 
    This will:

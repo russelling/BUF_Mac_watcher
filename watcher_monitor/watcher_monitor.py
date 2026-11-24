@@ -192,6 +192,8 @@ class MonitorWindow(QMainWindow):
         self.restart_btn = QPushButton("RESTART")
         self.stop_btn = QPushButton("STOP")
         self.reflag_btn = QPushButton("RE-RUN QT")
+        # EXTERNAL_RENDER_BUTTON_2026_11_19
+        self.external_btn = QPushButton("EXTERNAL RENDER")
 
         self.start_btn.setStyleSheet(theme.PRIMARY_BUTTON_CSS)
         self.restart_btn.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
@@ -202,6 +204,8 @@ class MonitorWindow(QMainWindow):
         self.restart_btn.clicked.connect(self.on_restart)
         self.stop_btn.clicked.connect(self.on_stop)
         self.reflag_btn.clicked.connect(self.on_reflag)
+        self.external_btn.setStyleSheet(theme.SECONDARY_BUTTON_CSS)
+        self.external_btn.clicked.connect(self.on_external)
 
         for b in (self.start_btn, self.restart_btn, self.stop_btn):
             b.setMinimumHeight(34)
@@ -215,6 +219,10 @@ class MonitorWindow(QMainWindow):
         self.reflag_btn.setMinimumWidth(120)
         self.reflag_btn.setCursor(Qt.PointingHandCursor)
         btn_row.addWidget(self.reflag_btn)
+        self.external_btn.setMinimumHeight(34)
+        self.external_btn.setMinimumWidth(150)
+        self.external_btn.setCursor(Qt.PointingHandCursor)
+        btn_row.addWidget(self.external_btn)
         outer.addLayout(btn_row)
 
         outer.addSpacing(24)
@@ -329,6 +337,26 @@ class MonitorWindow(QMainWindow):
             )
             return
         dlg = ReflagDialog(self)
+        if dlg.exec():
+            self.refresh()
+
+    def on_external(self):
+        """
+        Bring an EXR sequence or QT made outside the pipeline into a
+        shot and today's _staging package. Imported lazily, like
+        on_reflag, so a broken sgtk only disables this one button.
+        """
+        try:
+            from external_render_dialog import ExternalRenderDialog
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "External render unavailable",
+                "Could not load the external render dialog:\n\n%s: %s"
+                "\n\nIt needs Toolkit (sgtk) on PYTHONPATH - see "
+                "launch_watcher_monitor.command." % (type(exc).__name__, exc),
+            )
+            return
+        dlg = ExternalRenderDialog(self)
         if dlg.exec():
             self.refresh()
 
